@@ -1,0 +1,15 @@
+replicaCount: 1
+image:
+  repository: vllm/vllm-openai
+  tag: v0.11.0
+model: Qwen/Qwen3-0.6B
+gpuCount: 1
+service:
+  port: 8000
+resources:
+  requests:
+    cpu: "2"
+    memory: 8Gi
+  limits:
+    memory: 14Gi
+    nvidia.com/gpu: 1
