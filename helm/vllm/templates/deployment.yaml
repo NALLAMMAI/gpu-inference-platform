@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-vllm
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-vllm
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-vllm
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args:
+            - --model
+            - {{ .Values.model | quote }}
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --max-model-len
+            - "4096"
+          ports:
+            - containerPort: 8000
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+          volumeMounts:
+            - name: cache
+              mountPath: /root/.cache/huggingface
+      volumes:
+        - name: cache
+          emptyDir:
+            sizeLimit: 10Gi
