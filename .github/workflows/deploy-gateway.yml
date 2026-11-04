@@ -1,0 +1,53 @@
+name: Deploy FastAPI Gateway (CPU)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-gke-state
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate using Workload Identity Federation
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials gpu-inference-learning \
+            --zone us-central1-a \
+            --project "${{ vars.GCP_PROJECT_ID }}"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate and render Helm chart
+        run: |
+          helm lint helm/gateway
+          helm template learning helm/gateway > /tmp/gateway-rendered.yaml
+
+      - name: Deploy gateway to CPU node
+        run: helm upgrade --install learning-gateway helm/gateway --wait --timeout 6m
+
+      - name: Show deployed Pods and Service
+        run: |
+          kubectl get pods -l app=learning-gateway-gateway -o wide
+          kubectl get svc learning-gateway-gateway
