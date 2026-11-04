@@ -1,0 +1,14 @@
+replicaCount: 1
+image:
+  repository: python
+  tag: "3.12-slim"
+service:
+  port: 8080
+vllmBaseUrl: "http://learning-vllm:8000"
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
