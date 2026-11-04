@@ -25,6 +25,31 @@ The following are *single-run observations*, not statistical averages or a produ
 | 10 | 0.895 | 250 | 279.30 |
 | 20 | 1.568 | 500 | 318.95 |
 
+## Visualizations
+
+The following charts show the single-run identical-prompt experiment results.
+
+### Aggregate throughput vs concurrency
+
+![Aggregate output throughput versus concurrency](charts/throughput-vs-concurrency.svg)
+
+The sum of output tokens from all requests divided by the wall-clock time increased as concurrency increased.
+
+### Average request latency vs concurrency
+
+![Average request latency versus concurrency](charts/latency-vs-concurrency.svg)
+
+Approximate client-side average latencies (seconds) transcribed from the original on-screen results:
+
+| Concurrent requests | Approximate average request latency (s) |
+| ---: | ---: |
+| 1 | 0.478 |
+| 5 | 0.852 |
+| 10 | 0.820 |
+| 20 | 1.515 |
+
+**Caution:** Average latency values are approximate; the original per-request raw timing data for all runs is not stored. The single-request value includes a small amount of client-side overhead. The charts reflect single-run measurements, not repeat-trial averages.
+
 An earlier separate five-request run recorded 0.803 s wall-clock, 125 output tokens, and 155.60 output tokens/s. This shows run-to-run variation.
 
 A separate single-request upstream timing measurement printed by FastAPI was **246.10 ms**. This is the time spent awaiting the HTTPX upstream call to vLLM, and should **not** be directly equated with client-side latency or GPU compute-only time.
