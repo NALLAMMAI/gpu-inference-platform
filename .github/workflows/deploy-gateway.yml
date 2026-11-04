@@ -27,8 +27,13 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up gcloud
+      - name: Set up gcloud and GKE auth plugin
         uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Verify GKE auth plugin
+        run: gke-gcloud-auth-plugin --version
 
       - name: Configure kubectl
         run: |
