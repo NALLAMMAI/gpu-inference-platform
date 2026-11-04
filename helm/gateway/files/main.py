@@ -1,4 +1,5 @@
 import os
+import time
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
@@ -18,12 +19,15 @@ async def forward(request: Request, path: str):
         headers = {"content-type": request.headers.get("content-type", "application/json")}
         # Internal learning cluster only. No public ingress or authentication in this demo.
         async with httpx.AsyncClient(timeout=120.0) as client:
+            start = time.perf_counter()
             upstream = await client.request(
                 request.method,
                 f"{VLLM_URL}{path}",
                 content=body if body else None,
                 headers=headers,
             )
+            latency_ms = (time.perf_counter() - start) * 1000
+            print(f"vLLM request latency: {latency_ms:.2f} ms", flush=True)
         return Response(
             content=upstream.content,
             status_code=upstream.status_code,
