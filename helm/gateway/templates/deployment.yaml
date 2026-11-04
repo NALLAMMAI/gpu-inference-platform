@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-gateway
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-gateway
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-gateway
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: cpu-pool
+      containers:
+        - name: fastapi
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          # Learning-only shortcut: install Python packages at startup.
+          # Production deployments should build and pin a dedicated image.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              pip install --no-cache-dir fastapi==0.115.12 uvicorn==0.34.2 httpx==0.28.1 &&
+              exec uvicorn main:app --app-dir /app --host 0.0.0.0 --port 8080
+          env:
+            - name: VLLM_BASE_URL
+              value: {{ .Values.vllmBaseUrl | quote }}
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          volumeMounts:
+            - name: application-code
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: application-code
+          configMap:
+            name: {{ .Release.Name }}-gateway-code
