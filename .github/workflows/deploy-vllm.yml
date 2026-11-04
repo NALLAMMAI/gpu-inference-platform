@@ -1,0 +1,75 @@
+name: Deploy vLLM (NVIDIA L4)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type DEPLOY_VLLM to deploy a GPU inference Pod (requires running billable L4 node)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-gke-state
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirmation == 'DEPLOY_VLLM' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate using Workload Identity Federation
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud with GKE auth plugin
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials gpu-inference-learning \
+            --zone us-central1-a \
+            --project "${{ vars.GCP_PROJECT_ID }}"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Check GPU node capacity
+        run: |
+          kubectl get nodes -l cloud.google.com/gke-nodepool=gpu-l4-pool -o wide
+          kubectl get nodes -l cloud.google.com/gke-nodepool=gpu-l4-pool \
+            -o jsonpath='{.items[*].status.allocatable.nvidia\.com/gpu}'
+          echo
+
+      - name: Validate and render vLLM chart
+        run: |
+          helm lint helm/vllm
+          helm template learning helm/vllm > /tmp/vllm-rendered.yaml
+
+      - name: Deploy vLLM to GPU
+        run: helm upgrade --install learning helm/vllm --wait --timeout 15m
+
+      - name: Show vLLM Pod and Service
+        run: |
+          kubectl get pods -l app=learning-vllm -o wide
+          kubectl get svc learning-vllm
+
+      - name: Diagnostics if deployment fails
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl describe pods -l app=learning-vllm || true
+          kubectl logs -l app=learning-vllm --tail=100 || true
