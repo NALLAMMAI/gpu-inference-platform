@@ -33,6 +33,11 @@ spec:
             - "8000"
             - --max-model-len
             - "4096"
+          # GKE mounts NVIDIA driver libraries here for GPU containers.
+          # Allow vLLM to locate libcuda.so.1 at startup.
+          env:
+            - name: LD_LIBRARY_PATH
+              value: "/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/lib"
           ports:
             - containerPort: 8000
           resources:
