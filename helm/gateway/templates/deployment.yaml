@@ -9,6 +9,8 @@ spec:
       app: {{ .Release.Name }}-gateway
   template:
     metadata:
+      annotations:
+        checksum/application-code: {{ .Files.Get "files/main.py" | sha256sum | quote }}
       labels:
         app: {{ .Release.Name }}-gateway
     spec:
