@@ -60,6 +60,24 @@ python3 tests/smoke_test.py
 
 Model weights are cached in ephemeral Pod storage and are re-downloaded if a new Pod starts. The inference API is not publicly exposed.
 
+## Inference benchmarking
+
+The [benchmarking script](benchmarks/load_test.py) sends concurrent requests through the FastAPI gateway to vLLM. It supports identical prompts and a varied-prompt workload. See [benchmark results and reproduction steps](benchmarks/README.md) for measured latency/throughput, limitations, and cost cautions.
+
+With the GKE cluster and GPU node running:
+
+```bash
+# Terminal 1
+kubectl port-forward svc/learning-gateway-gateway 8080:8080
+
+# Terminal 2 (from repository root)
+python3 -m pip install --user httpx
+python3 benchmarks/load_test.py 5 --mode identical
+python3 benchmarks/load_test.py 20 --mode varied
+```
+
+The FastAPI gateway forwards `/v1/chat/completions` to the internal vLLM Service. The GPU node is billable while running.
+
 ## CI/CD roadmap
 
 The current GitHub Actions workflow checks Terraform formatting/validation and Helm lint/render. It **does not create or destroy cloud infrastructure**. Later improvements: remote Terraform state in Google Cloud Storage, GitHub OIDC with Workload Identity Federation, approval-gated infrastructure apply/destroy, and separate application deployment.
