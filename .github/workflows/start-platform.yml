@@ -1,0 +1,118 @@
+name: Start GPU Inference Platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type START_GPU_PLATFORM to create billable GKE CPU and NVIDIA L4 GPU resources'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize with existing apply/scale/destroy/deploy workflows.
+concurrency:
+  group: terraform-gke-state
+  cancel-in-progress: false
+
+jobs:
+  start-platform:
+    if: ${{ inputs.confirmation == 'START_GPU_PLATFORM' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate using Workload Identity Federation
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Initialize Terraform GCS backend and validate
+        working-directory: terraform
+        run: |
+          terraform init -input=false
+          terraform validate
+
+      - name: Step 1 - Create CPU-only GKE cluster
+        working-directory: terraform
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          terraform plan -input=false -lock-timeout=5m \
+            -var="project_id=$PROJECT_ID" \
+            -var="gpu_node_count=0" -out=cpu-plan
+          terraform apply -input=false -lock-timeout=5m -auto-approve cpu-plan
+
+      - name: Step 2 - Scale NVIDIA L4 GPU pool to one node
+        working-directory: terraform
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          terraform plan -input=false -lock-timeout=5m \
+            -var="project_id=$PROJECT_ID" \
+            -var="gpu_node_count=1" -out=gpu-plan
+          terraform apply -input=false -lock-timeout=5m -auto-approve gpu-plan
+
+      - name: Set up gcloud with GKE auth plugin
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure kubectl
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          gcloud container clusters get-credentials gpu-inference-learning \
+            --zone us-central1-a --project "$PROJECT_ID"
+
+      - name: Wait for CPU and GPU nodes
+        run: |
+          kubectl wait --for=condition=Ready nodes \
+            -l cloud.google.com/gke-nodepool=cpu-pool --timeout=10m
+          kubectl wait --for=condition=Ready nodes \
+            -l cloud.google.com/gke-nodepool=gpu-l4-pool --timeout=15m
+          kubectl get nodes -o wide
+          echo "GPU allocatable:"
+          kubectl get nodes -l cloud.google.com/gke-nodepool=gpu-l4-pool \
+            -o jsonpath='{.items[*].status.allocatable.nvidia\.com/gpu}'
+          echo
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Step 3 - Deploy vLLM to NVIDIA L4
+        run: |
+          helm lint helm/vllm
+          helm upgrade --install learning helm/vllm --wait --timeout 15m
+
+      - name: Step 4 - Deploy FastAPI gateway to CPU node
+        run: |
+          helm lint helm/gateway
+          helm upgrade --install learning-gateway helm/gateway --wait --timeout 6m
+
+      - name: Verify deployed services and pods
+        run: |
+          kubectl get nodes -o wide
+          kubectl get pods -o wide
+          kubectl get svc learning-vllm learning-gateway-gateway
+          kubectl rollout status deployment/learning-vllm --timeout=2m
+          kubectl rollout status deployment/learning-gateway-gateway --timeout=2m
+          echo "Platform deployment complete. Access is internal; use kubectl port-forward to test."
+
+      - name: Diagnostics if deployment fails
+        if: failure()
+        run: |
+          kubectl get nodes -o wide || true
+          kubectl get pods -A -o wide || true
+          kubectl describe pods -l app=learning-vllm || true
+          kubectl logs -l app=learning-vllm --tail=100 || true
