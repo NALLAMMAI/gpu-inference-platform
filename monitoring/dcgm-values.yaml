@@ -18,6 +18,17 @@ extraEnv:
   - name: LD_LIBRARY_PATH
     value: /usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/lib
 
+# GKE COS driver path: expose NVIDIA libraries to the exporter, read-only.
+# Confirm this host path is populated on the GPU node if exporter still fails.
+extraHostVolumes:
+  - name: nvidia-driver-host
+    hostPath: /home/kubernetes/bin/nvidia
+
+extraVolumeMounts:
+  - name: nvidia-driver-host
+    mountPath: /usr/local/nvidia
+    readOnly: true
+
 service:
   enable: true
   type: ClusterIP
