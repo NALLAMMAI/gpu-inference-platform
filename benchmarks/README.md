@@ -139,6 +139,12 @@ Three long requests started at t≈0; two short requests started at t≈1 second
 | R4 (later) | 1.036 | 1.639 | 0.603 | 46 | stop |
 | R5 (later) | 1.037 | 1.500 | 0.463 | 31 | stop |
 
+#### Client-observed request lifetime
+
+![Client-observed request lifetime for the five staggered arrivals](charts/continuous-batching-request-lifetime.svg)
+
+The horizontal bars show the measured start-to-finish lifetime of each request. R4 and R5 start later but finish before R1–R3.
+
 **Summary:** 5/5 successful requests; 4.197 s wall-clock; 1,595 generated output tokens. The two later requests finished while the initial three continued running. Although `--short-tokens 300` allowed longer outputs, R4 and R5 stopped naturally at 46 and 31 tokens.
 
 **Direct vLLM scheduler metrics**, polled at roughly 200 ms plus HTTP scrape time, showed this sequence:
@@ -147,6 +153,20 @@ Three long requests started at t≈0; two short requests started at t≈1 second
 num_requests_running: 0 -> 3 -> 4 -> 3 -> 0
 num_requests_waiting: 0 throughout the observed samples
 ```
+
+#### Running versus waiting requests
+
+![Observed running and waiting request counts in the vLLM scheduler](charts/continuous-batching-scheduler-metrics.svg)
+
+| Observation | Running requests | Waiting requests |
+| --- | ---: | ---: |
+| Idle | 0 | 0 |
+| Initial requests active | 3 | 0 |
+| Additional work admitted | 4 | 0 |
+| Later short requests completed | 3 | 0 |
+| All requests completed | 0 | 0 |
+
+The phases summarize successive observed states; they are **not equally spaced in time**, and not every intermediate scheduler state was captured.
 
 The increase **3 → 4** while initial requests were active is evidence of **dynamic admission of additional work**, consistent with vLLM continuous batching. No sample showed five running requests; the polling interval may have missed transient states. These gauges do not reveal individual per-token GPU batch membership or quantify speedup relative to a static scheduler.
 
