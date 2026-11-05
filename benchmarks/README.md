@@ -123,11 +123,53 @@ python3 benchmarks/load_test_continuous_batching.py
 python3 benchmarks/load_test_continuous_batching.py --delay 0.5
 ```
 
-Initial requests allow up to 512 output tokens and late requests up to 80 (both configurable). Requests are non-streaming because the current FastAPI gateway buffers vLLM responses. **Timing overlap is not enough to prove that the vLLM scheduler performed continuous batching.** That requires inspecting vLLM metrics or traces showing active/waiting requests and new admissions during ongoing decode. No results from this experiment have been recorded yet.
+Initial requests allow up to 512 output tokens and late requests up to 80 (both configurable). Requests are non-streaming because the current FastAPI gateway buffers vLLM responses.
+
+### Recorded results: staggered arrivals (November 4, 2026)
+
+Three long requests started at t≈0; two short requests started at t≈1 second. Two runs were recorded. The second run also included direct sampling of vLLM's Prometheus metrics and is the primary scheduler observation here.
+
+**Latest client-side run** (`--delay 1 --short-tokens 300`):
+
+| Request | Start (s) | Finish (s) | Latency (s) | Output tokens | Finish reason |
+| --- | ---: | ---: | ---: | ---: | --- |
+| R1 (long) | 0.000 | 4.147 | 4.147 | 512 | length |
+| R2 (long) | 0.034 | 4.197 | 4.163 | 512 | length |
+| R3 (long) | 0.034 | 4.117 | 4.082 | 494 | stop |
+| R4 (later) | 1.036 | 1.639 | 0.603 | 46 | stop |
+| R5 (later) | 1.037 | 1.500 | 0.463 | 31 | stop |
+
+**Summary:** 5/5 successful requests; 4.197 s wall-clock; 1,595 generated output tokens. The two later requests finished while the initial three continued running. Although `--short-tokens 300` allowed longer outputs, R4 and R5 stopped naturally at 46 and 31 tokens.
+
+**Direct vLLM scheduler metrics**, polled at roughly 200 ms plus HTTP scrape time, showed this sequence:
+
+```text
+num_requests_running: 0 -> 3 -> 4 -> 3 -> 0
+num_requests_waiting: 0 throughout the observed samples
+```
+
+The increase **3 → 4** while initial requests were active is evidence of **dynamic admission of additional work**, consistent with vLLM continuous batching. No sample showed five running requests; the polling interval may have missed transient states. These gauges do not reveal individual per-token GPU batch membership or quantify speedup relative to a static scheduler.
+
+**Earlier staggered run** (`--delay 1`, default short token limit 80): 5/5 successful; 4.096 s wall-clock; 1,562 generated tokens. Initial requests finished around t=3.843–4.096 s, whereas R4 and R5 started around t=1.034 s and finished at t=1.708 s and t=1.624 s. Its sampled metrics showed 0 → 3 → 0 running, without capturing the brief later admission.
+
+### Inspect scheduler metrics during a new test
+
+With a separate Cloud Shell terminal port-forwarding `svc/learning-vllm` to local port 8000, monitor:
+
+```bash
+while true; do
+  date +%H:%M:%S
+  curl -sS http://localhost:8000/metrics \
+    | grep -E '^vllm:num_requests_(running|waiting)\\{'
+  sleep 0.2
+done
+```
+
+Run the staggered test via the gateway port-forward (local 8080) in another terminal. This is a learning-scale observation, not a rigorous traced scheduler benchmark.
 
 ## Interpretation and limitations
 
-Throughput increased with concurrency in these initial runs, consistent with overlapping work and possible continuous batching. The exact internal batching behavior was **not measured**. Since all original prompts were identical, cache reuse may influence results if prefix caching was enabled. No repeated trials, warm-up standardization, token-length matching, GPU utilization measurements, streaming TTFT, p95 latency, or GPU-only timings were collected. The script currently uses non-streaming responses.
+Throughput increased with concurrency in these initial runs, consistent with overlapping work and possible continuous batching. A separate staggered-arrival experiment observed dynamic request admission via the vLLM running-request gauge, but exact token-level GPU batch composition and static-batching comparative speedup were **not measured**. Since all original prompts were identical, cache reuse may influence results if prefix caching was enabled. No repeated trials, warm-up standardization, token-length matching, GPU utilization measurements, streaming TTFT, p95 latency, or GPU-only timings were collected. The script currently uses non-streaming responses.
 
 For better comparisons: repeat every concurrency setting several times, collect average/p95 latency, use mixed prompt and output lengths, check prefix-caching configuration, and inspect GPU utilization and vLLM metrics.
 
