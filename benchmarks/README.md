@@ -66,16 +66,14 @@ A separate single-request upstream timing measurement printed by FastAPI was **2
 
 A subsequent single run used **20 concurrent different prompts**, each requesting a one-sentence answer with `/no_think`, `temperature=0`, and `max_tokens=100`. The questions covered Kubernetes, Docker, Terraform, Python, GPU infrastructure, and related concepts.
 
-| Metric | 20 identical prompts | 20 varied prompts |
+| Metric | Identical prompts | Different prompts |
 | --- | ---: | ---: |
+| Concurrent requests | 20 | 20 |
 | Successful requests | 20 | 20 |
-| Failed requests | Not separately reported; 20 results shown | 0 |
 | Wall-clock time | 1.568 s | 1.987 s |
-| Average request latency | ~1.515 s (approximate) | 1.815 s |
-| Minimum request latency | — | 1.745 s |
-| Maximum request latency | — | 1.953 s |
+| Average request latency | ~1.515 s | 1.815 s |
 | Total output tokens | 500 | 544 |
-| Aggregate output throughput | 318.95 tokens/s | 273.76 tokens/s |
+| Aggregate throughput | 318.95 tok/s | 273.76 tok/s |
 
 For the varied-prompt run, all 20 responses had `finish_reason=stop`. These observations represent **one trial of each workload**; differences are not attributable solely to prompt variation because prompt lengths, output lengths, scheduling, caching and other factors vary. The throughput was about 14% lower and average latency about 20% higher in this single comparison.
 
