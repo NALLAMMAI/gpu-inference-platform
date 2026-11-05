@@ -24,7 +24,20 @@ extraHostVolumes:
   - name: nvidia-driver-host
     hostPath: /home/kubernetes/bin/nvidia
 
+# Restore chart's custom-metrics ConfigMap mount. Overriding lists replaces chart defaults.
+extraConfigMapVolumes:
+  - name: exporter-metrics-volume
+    configMap:
+      name: exporter-metrics-config-map
+      items:
+        - key: metrics
+          path: default-counters.csv
+
 extraVolumeMounts:
+  - name: exporter-metrics-volume
+    mountPath: /etc/dcgm-exporter/default-counters.csv
+    subPath: default-counters.csv
+    readOnly: true
   - name: nvidia-driver-host
     mountPath: /usr/local/nvidia
     readOnly: true
