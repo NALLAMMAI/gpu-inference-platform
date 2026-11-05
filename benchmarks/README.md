@@ -111,6 +111,20 @@ To inspect FastAPI's upstream HTTP timings:
 kubectl logs deployment/learning-gateway-gateway --tail=100 | grep "vLLM request latency"
 ```
 
+## Staggered-arrival continuous batching experiment
+
+A separate [Python experiment](load_test_continuous_batching.py) starts three long-generation requests and introduces two shorter requests after a configurable delay. It prints when each request begins and finishes relative to a shared clock.
+
+```bash
+# With the FastAPI gateway port-forward still running
+python3 benchmarks/load_test_continuous_batching.py
+
+# Optional: send late requests after 0.5 seconds instead of 1 second
+python3 benchmarks/load_test_continuous_batching.py --delay 0.5
+```
+
+Initial requests allow up to 512 output tokens and late requests up to 80 (both configurable). Requests are non-streaming because the current FastAPI gateway buffers vLLM responses. **Timing overlap is not enough to prove that the vLLM scheduler performed continuous batching.** That requires inspecting vLLM metrics or traces showing active/waiting requests and new admissions during ongoing decode. No results from this experiment have been recorded yet.
+
 ## Interpretation and limitations
 
 Throughput increased with concurrency in these initial runs, consistent with overlapping work and possible continuous batching. The exact internal batching behavior was **not measured**. Since all original prompts were identical, cache reuse may influence results if prefix caching was enabled. No repeated trials, warm-up standardization, token-length matching, GPU utilization measurements, streaming TTFT, p95 latency, or GPU-only timings were collected. The script currently uses non-streaming responses.
