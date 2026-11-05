@@ -1,0 +1,29 @@
+# NVIDIA DCGM Exporter: collect telemetry on the existing L4 node.
+# No nvidia.com/gpu resource request: vLLM retains the GPU allocation.
+nodeSelector:
+  cloud.google.com/gke-nodepool: gpu-l4-pool
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Equal
+    value: present
+    effect: NoSchedule
+
+service:
+  enable: true
+  type: ClusterIP
+  port: 9400
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  additionalLabels:
+    release: monitoring
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
