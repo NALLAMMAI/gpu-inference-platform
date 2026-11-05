@@ -12,6 +12,12 @@ tolerations:
     value: present
     effect: NoSchedule
 
+# First diagnostic fix: make the GKE-mounted NVIDIA libraries discoverable.
+# This helps only if the runtime actually mounts the libraries into the Pod.
+extraEnv:
+  - name: LD_LIBRARY_PATH
+    value: /usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/lib
+
 service:
   enable: true
   type: ClusterIP
