@@ -1,5 +1,8 @@
 # NVIDIA DCGM Exporter: collect telemetry on the existing L4 node.
 # No nvidia.com/gpu resource request: vLLM retains the GPU allocation.
+# GKE rejects system-node-critical priority for ordinary workloads.
+priorityClassName: ""
+
 nodeSelector:
   cloud.google.com/gke-nodepool: gpu-l4-pool
 
