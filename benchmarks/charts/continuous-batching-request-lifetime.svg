@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 360" role="img" aria-labelledby="title desc">
+<title id="title">Client-observed request lifetime</title>
+<desc id="desc">Five requests; R1 to R3 start near zero and complete around 4.1 seconds, R4 and R5 begin at 1.04 seconds and finish around 1.5 to 1.64 seconds.</desc>
+<rect width="780" height="360" fill="#fff"/>
+<g font-family="Arial,Helvetica,sans-serif">
+<text x="35" y="43" font-size="24" fill="#0f172a" font-weight="700">Client-observed request lifetime</text>
+<text x="35" y="67" font-size="14" fill="#64748b">Staggered vLLM requests · actual measured start and finish times</text>
+<line x1="112" x2="112" y1="100" y2="285" stroke="#dbe3ea" stroke-dasharray="4 4"/><text x="112" y="308" font-size="13" text-anchor="middle" fill="#475569">0s</text>
+<line x1="243.8181818181818" x2="243.8181818181818" y1="100" y2="285" stroke="#dbe3ea" stroke-dasharray="4 4"/><text x="243.8181818181818" y="308" font-size="13" text-anchor="middle" fill="#475569">1s</text>
+<line x1="375.6363636363636" x2="375.6363636363636" y1="100" y2="285" stroke="#dbe3ea" stroke-dasharray="4 4"/><text x="375.6363636363636" y="308" font-size="13" text-anchor="middle" fill="#475569">2s</text>
+<line x1="507.45454545454544" x2="507.45454545454544" y1="100" y2="285" stroke="#dbe3ea" stroke-dasharray="4 4"/><text x="507.45454545454544" y="308" font-size="13" text-anchor="middle" fill="#475569">3s</text>
+<line x1="639.2727272727273" x2="639.2727272727273" y1="100" y2="285" stroke="#dbe3ea" stroke-dasharray="4 4"/><text x="639.2727272727273" y="308" font-size="13" text-anchor="middle" fill="#475569">4s</text>
+<text x="70" y="125" fill="#334155" font-size="15" font-weight="600">R1</text>
+<rect x="112" y="109" width="546.65" height="24" rx="4" fill="#0f766e"/>
+<text x="667.65" y="126" fill="#334155" font-size="12">4.147s</text>
+<text x="70" y="159" fill="#334155" font-size="15" font-weight="600">R2</text>
+<rect x="116.48181818181818" y="143" width="548.7590909090909" height="24" rx="4" fill="#0f766e"/>
+<text x="674.240909090909" y="160" fill="#334155" font-size="12">4.197s</text>
+<text x="70" y="193" fill="#334155" font-size="15" font-weight="600">R3</text>
+<rect x="116.48181818181818" y="177" width="538.2136363636364" height="24" rx="4" fill="#0f766e"/>
+<text x="663.6954545454545" y="194" fill="#334155" font-size="12">4.117s</text>
+<text x="70" y="227" fill="#334155" font-size="15" font-weight="600">R4</text>
+<rect x="248.56363636363636" y="211" width="79.48636363636362" height="24" rx="4" fill="#2563eb"/>
+<text x="337.05" y="228" fill="#334155" font-size="12">1.639s</text>
+<text x="70" y="261" fill="#334155" font-size="15" font-weight="600">R5</text>
+<rect x="248.6954545454545" y="245" width="61.03181818181819" height="24" rx="4" fill="#2563eb"/>
+<text x="318.72727272727275" y="262" fill="#334155" font-size="12">1.500s</text>
+<rect x="142" y="334" width="12" height="12" rx="2" fill="#0f766e"/><text x="161" y="345" font-size="12" fill="#475569">Initial long requests</text>
+<rect x="353" y="334" width="12" height="12" rx="2" fill="#2563eb"/><text x="372" y="345" font-size="12" fill="#475569">Later short requests</text>
+</g></svg>
