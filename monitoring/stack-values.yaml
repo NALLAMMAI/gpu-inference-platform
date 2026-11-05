@@ -1,0 +1,70 @@
+# Lightweight monitoring for the learning GKE cluster.
+# Prometheus and Grafana run on CPU pool; GPU exporter has separate values.
+# Data is ephemeral: deleting/restarting Prometheus may lose metrics history.
+alertmanager:
+  enabled: false
+
+defaultRules:
+  create: false
+
+kubernetesServiceMonitors:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+nodeExporter:
+  enabled: false
+
+prometheusOperator:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: cpu-pool
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+prometheus:
+  prometheusSpec:
+    nodeSelector:
+      cloud.google.com/gke-nodepool: cpu-pool
+    retention: 6h
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector:
+      matchLabels:
+        release: monitoring
+    serviceMonitorNamespaceSelector: {}
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1536Mi
+    storageSpec: {}
+
+grafana:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: cpu-pool
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  service:
+    type: ClusterIP
