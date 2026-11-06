@@ -1,0 +1,20 @@
+# Prometheus Operator ServiceMonitor for the vLLM Service.
+# Apply after kube-prometheus-stack and helm/vllm are deployed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      name: learning-vllm
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 30s
