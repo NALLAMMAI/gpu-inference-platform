@@ -6,17 +6,17 @@ Environment: GKE, one NVIDIA L4 GPU (24 GiB VRAM), `Qwen/Qwen3-0.6B` on vLLM, Op
 
 ## Experiment summary
 
-| ID | Prompt / workload | Concurrent workers | Completed requests | Requests/sec | Output tokens/sec |
-| --- | --- | ---: | ---: | ---: | ---: |
-| 1 | **P1:** Short, identical Kubernetes question | 4 | 117 | 1.89 | Not recorded |
-| 2 | **P1:** Short, identical Kubernetes question (**two runs grouped**) | 8 | 218–224 | 3.56–3.62 | Not recorded |
-| 3 | **P2:** 40-section repetitive technical prompt; eight topics | 8 | 287 | 4.65 | Not recorded |
-| 4 | **P2:** Same repetitive prompt pattern, now with token and latency measurements | 8 | 294 | 4.77 | 673.21 |
-| 5a | **P3:** Sixteen incident-analysis prompts, rotated across workers | 4 | 108 | 1.78 | 455.35 |
-| 5b | **P3:** Same fixed prompt pool | 8 | 193 | 3.12 | 798.50 |
-| 5c | **P3:** Same fixed prompt pool | 16 | 313 | 5.01 | 1,281.51 |
+| Test | Prompt | Workers | Requests | Requests/sec | Output tokens/sec | p95 latency |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | P1 short | 4 | 117 | 1.89 | Not measured | Not measured |
+| 2 | P1 short (two runs combined) | 8 | 218–224 | 3.56–3.62 | Not measured | Not measured |
+| 3 | P2 repetitive | 8 | 287 | 4.65 | Not measured | Not measured |
+| 4 | P2 repetitive + token metrics | 8 | 294 | 4.77 | 673.21 | 2.58 s |
+| 5a | P3 incidents | 4 | 108 | 1.78 | 455.35 | 2.359 s |
+| 5b | P3 incidents | 8 | 193 | 3.12 | 798.50 | 2.671 s |
+| 5c | P3 incidents | 16 | 313 | 5.01 | 1,281.51 | 3.400 s |
 
-**Notes:** Test 2 combines two separate runs of the same configuration; ranges are not averages. Tests 3 and 4 use the same *workload pattern* but were separate executions. The P3 tests use different prompts from P1/P2, so do not interpret cross-workload differences as pure concurrency scaling.
+Test 2 combines two repeated runs (shown as ranges); Tests 3 and 4 use the same P2 workload pattern but different measurements. P2 and P3 workloads differ and should not be directly compared as controlled concurrency experiments.
 
 ## Prompt definitions
 
