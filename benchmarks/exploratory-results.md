@@ -114,57 +114,101 @@ The test uses a 60-second request-admission window with closed-loop workers; in-
 
 Because prompts share a substantial common background and the 16 prompts are reused, cache effects can inflate apparent prompt-processing throughput relative to entirely fresh prompts. Nearly all outputs hitting the 256-token cap means this benchmark primarily measures fixed-length generation performance, **not** the quality or completeness of the incident diagnoses. The final-run Grafana screenshot (November 5, 2026; approximately 19:13–19:31) showed three clearly separated load periods. Approximate visually sampled GPU utilization during those periods was 84–87%, 82–85%, and 88% for 4, 8, and 16 workers respectively. The GPU allocated VRAM line remained near 20.7 GiB. Temperature peaked around 60–61 °C and power around 71–73 W while loaded; idle power returned near 35 W and temperature near 49–50 °C between runs. These are visual estimates from Grafana's ~30-second scrape samples, **not** precise time-series maxima. A second screenshot of the same three test windows showed sampled running requests of **4, 8 and 16** respectively, matching configured worker counts. Visually estimated sampled KV-cache occupancy peaks were approximately **1–2%, 2–3% and 5%** respectively. Waiting requests remained **0 at all visible samples**. These are samples, not proof that queues never occurred between 30-second scrapes. Both Grafana screenshots are preserved under `benchmarks/charts/` and embedded below.
 
-### Interpreting P3: concurrency, user capacity, and serving efficiency
+### Performance findings and analysis (P3)
 
-### What does a benchmark worker represent?
+#### How to interpret a worker
 
-A **worker models one continuously active client**, similar to a user who immediately submits another request after receiving each completed response. It is **not** equivalent to one registered account, connected session, or a typical human user.
+A worker is **one continuously active client**, loosely analogous to a user making repeated requests. Each worker sends one request, waits for the *entire non-streaming response*, then immediately sends another. Therefore **4, 8 and 16 workers mean up to 4, 8 and 16 concurrent in-flight client requests**—not 4, 8 or 16 registered users.
 
-The Python test uses a *closed-loop* pattern:
+Unlike a real person, a benchmark worker has no reading or typing pauses. A system could serve many more connected users with only a few simultaneously active requests. Conversely, longer prompts and outputs could put more pressure on the GPU with the same number of workers.
 
 ```text
-Worker: send one chat-completion request
-        -> wait for full non-streaming response
-        -> immediately send the next request
-        -> repeat until the 60-second admission window ends
+Worker -> send prompt -> vLLM scheduler/GPU -> complete response
+       -> immediately send next prompt -> repeat
 ```
 
-With 4, 8 or 16 workers, there can be **at most 4, 8 or 16 client requests in flight at a time**, respectively. Real users pause to read, type, and think; a production application may therefore support many more connected users than the number of continuously active workers. Conversely, longer prompts, longer generations, and traffic bursts can reduce the number of active requests the server can handle at a target latency.
+#### Finding A — More concurrent workers increased total throughput
 
-### What the three tests demonstrate
+| Concurrent workers | Completed requests | Requests/sec | Aggregate output tokens/sec |
+| ---: | ---: | ---: | ---: |
+| 4 | 108 | 1.78 | 455.35 |
+| 8 | 193 | 3.12 | 798.50 |
+| 16 | 313 | 5.01 | 1,281.51 |
 
-**Aggregate throughput scaled as concurrency increased.** Moving from 4 to 16 workers raised observed completion throughput from **1.78 to 5.01 requests/sec** and aggregate output throughput from **455.35 to 1,281.51 output tokens/sec**, about **2.81×** improvement with **4×** more workers. The 8-worker midpoint delivered 3.12 requests/sec and 798.50 output tokens/sec.
+With 4 workers, the L4 generated roughly **455 output tokens/sec** across all requests. With 16 workers, it generated about **1,282 output tokens/sec**—**2.81× more aggregate throughput for 4× more concurrent workers**.
 
-vLLM's *continuous batching* provides a plausible mechanism: it can schedule and execute token-generation work for several active requests together instead of treating every request as an isolated serial GPU job. The benchmark is consistent with better aggregate GPU efficiency from increased batching opportunities; **it does not isolate batching as the only cause** of the observed gains.
+Output tokens/sec is **total completion tokens returned in successful requests divided by elapsed wall-clock time**. It is not the per-user token generation rate. Here, almost all requests hit the configured maximum of 256 completion tokens, so request throughput and output token throughput scale together.
 
-**Latency rose at higher concurrency.** Median latency went from **2.227 s → 2.504 s → 3.194 s**. p95 latency went from **2.359 s → 2.671 s → 3.400 s**, an increase of roughly **44%** between 4 and 16 workers. This is the central **throughput–latency tradeoff**: the server completes more work overall, but each request may take longer when more requests share GPU execution resources.
+**Why might throughput improve?** vLLM supports *continuous batching*: it can schedule multiple active sequences together, improving the amount of useful work accomplished by the GPU. Our measurements are consistent with increased batching efficiency, but this test does **not prove batching alone caused** the throughput gains.
 
-**No sustained admission queue was visible in sampled monitoring.** The Grafana running-request gauge reached approximately **4, 8 and 16**, matching the corresponding worker counts; the waiting-request gauge showed **0** at the visible samples in all three periods. This suggests the vLLM scheduler admitted the tested load without an observable sustained queue. However, 30-second Prometheus scrapes can miss transient waits, and concurrent running requests still compete for GPU execution capacity.
+The GPU utilization samples remained roughly 80–90% across these tests while output tokens/sec increased. GPU utilization indicates how often the GPU is busy over the sampled interval, **not** its useful token generation throughput.
 
-**KV-cache occupancy grew but stayed low.** Visually estimated sampled KV-cache occupancy was approximately **1–2%**, **2–3%**, and **5%** for 4, 8, and 16 workers. This is consistent with more active sequences requiring additional attention key/value storage. It provides **no evidence that KV-cache capacity was exhausted or the limiting factor** at these concurrency levels. The roughly 20.7 GiB GPU framebuffer allocation remained stable because vLLM preallocates much of its GPU memory; this is different from the percentage of available KV-cache blocks actively occupied.
+#### Finding B — Individual responses became slower
 
-**GPU busy time is not the same as useful inference throughput.** GPU utilization during load was visually around **80–90%** in all three periods, yet aggregate output tokens/sec rose substantially. The utilization metric reflects the fraction of time the GPU appears busy over a sampling interval, not the number of useful generated tokens produced per second. More concurrent work can increase useful throughput with little change in the sampled utilization percentage.
+| Concurrent workers | Average latency | p50 latency | p95 latency |
+| ---: | ---: | ---: | ---: |
+| 4 | 2.248 s | 2.227 s | 2.359 s |
+| 8 | 2.520 s | 2.504 s | 2.671 s |
+| 16 | 3.163 s | 3.194 s | 3.400 s |
 
-### Can we say the GPU supports 16 users?
+At 4 workers, approximately 95% of successful requests completed within **2.36 seconds**. At 16 workers, p95 increased to **3.40 seconds**, roughly **44% higher**.
 
-The supported statement is:
+**How was this latency measured?** The Python client starts a monotonic timer immediately before the HTTP request and stops it after the full JSON response has been received and parsed. p95 is the nearest-rank 95th percentile of those per-request elapsed times. The measurement includes client and port-forward overhead, vLLM scheduling, prefill and decode; it is **not** GPU kernel time, time to first token (TTFT), or inter-token latency (ITL).
 
-> In this single-run synthetic benchmark, one NVIDIA L4 serving Qwen3-0.6B completed **313 requests in 62.52 seconds** with **16 continuously active client workers**, **5.01 requests/sec**, **1,281.51 generated tokens/sec**, **3.40-second p95 end-to-end latency**, and **zero errors**.
+**Interpretation:** The server did more work overall, but individual requests took longer because simultaneous inference sequences share GPU execution and memory-bandwidth capacity. This is the central **throughput–latency tradeoff**.
 
-That **does not establish a maximum of 16 users**. A production capacity claim requires an explicit service-level objective (for example, a p95 response-time limit), a realistic distribution of prompt/output lengths and user think times, an arrival-rate model, longer runs, repeated trials, and monitoring of error rates and queue growth.
+#### Finding C — No sustained request queue was visible
 
-### Configuration choice and limits of this evidence
+| Workers | Sampled running requests | Sampled waiting requests |
+| ---: | ---: | ---: |
+| 4 | 4 | 0 |
+| 8 | 8 | 0 |
+| 16 | 16 | 0 |
 
-- **4 workers:** Lowest measured p95 latency (**2.36 s**), but least aggregate throughput (**455 output tokens/sec**).
-- **8 workers:** Intermediate point (**799 output tokens/sec**, **2.67 s p95**), a potential latency-conscious compromise.
-- **16 workers:** Highest tested throughput (**1,282 output tokens/sec**) with **3.40 s p95**; choose it only if that tail latency meets application requirements.
-- There was **no observed throughput plateau by 16 workers**, so this benchmark did not establish the GPU's maximum throughput or saturation point.
-- Prompts averaged **387.7 input tokens** rather than the original ~800-token target. The same 16 scenarios recur, and they share identical infrastructure background text, so **prefix caching may influence results**.
-- Nearly every response generated **256 output tokens**, the configured limit. Many answers may be truncated, so this chiefly probes bounded-length output generation, **not whether the incident response is complete or correct**.
-- Timing includes the Cloud Shell client and direct local port-forward to vLLM, not the FastAPI gateway. No gateway latency is included.
-- All results reflect **one run per concurrency level**. Run-to-run variability and caching effects were not controlled with replicated trials, so avoid making statistically precise claims.
+Grafana captured running-request counts corresponding to the configured worker counts, while the waiting-request gauge showed **zero at the visible samples**.
 
-**Engineering conclusion:** For this controlled incident-analysis workload, vLLM on a single L4 showed improving aggregate throughput as active concurrency increased from 4 to 16, with a measurable increase in per-request latency and without visible sustained queueing or KV-cache exhaustion. Selecting a production concurrency target requires a latency SLO and additional representative workload testing.
+**Interpretation:** vLLM admitted the observed load without a sustained queue visible in monitoring. This does **not** establish zero resource contention or guarantee there was never any waiting: Prometheus scraped approximately every 30 seconds and could miss brief queueing.
+
+#### Finding D — KV-cache capacity was not a visible bottleneck
+
+| Workers | Approximate sampled KV-cache occupancy |
+| ---: | ---: |
+| 4 | 1–2% |
+| 8 | 2–3% |
+| 16 | ~5% |
+
+Occupancy increased as more sequences ran concurrently, but remained low even at 16 workers. These figures are **visual estimates from the Grafana screenshot**, not precise exported maxima.
+
+The GPU framebuffer allocation remained near **20.7 GiB**, but that reflects model weights and vLLM allocations, including reserved KV-cache capacity—not active KV-cache occupancy. **Nothing in these samples suggests KV-cache capacity was exhausted** at the tested concurrency levels.
+
+#### How many real users can one L4 support?
+
+**What we actually demonstrated:** One L4 running Qwen3-0.6B served **313 successful requests** with **16 continuously active workers** during **62.52 seconds**, achieving **5.01 requests/sec**, **1,281.51 aggregate output tokens/sec**, and **3.40 s p95 request completion latency**, with **zero errors**.
+
+This is **not a maximum-user-capacity measurement**. A production capacity decision depends on realistic user think time, request arrival rates, prompt/output length distributions, latency targets, uptime requirements, and repeat trials.
+
+As a practical example, suppose the application requires **p95 request completion under 3 seconds** for this specific workload:
+
+| Workers | p95 latency | Meets a hypothetical 3-second p95 target? |
+| ---: | ---: | :---: |
+| 4 | 2.359 s | Yes |
+| 8 | 2.671 s | Yes |
+| 16 | 3.400 s | No |
+
+Then **8 workers** would provide the highest measured throughput *among these tested settings* while meeting that hypothetical target. With a 4-second p95 target, 16 workers would deliver more throughput. Neither target was an actual requirement for this experiment.
+
+#### Engineering conclusions
+
+1. **Throughput increased with active concurrency:** from 455.35 to 1,281.51 aggregate output tokens/sec (2.81× from 4 to 16 workers). vLLM's continuous batching is a plausible contributor.
+2. **Higher concurrency had a latency cost:** p95 rose from 2.359 to 3.400 seconds (~44%).
+3. **KV-cache capacity did not appear constrained:** sampled occupancy was only around 5% at the highest tested load.
+4. **The server handled the tested requests with zero errors and no sustained queue visible in sampled metrics.** Brief queueing cannot be ruled out.
+5. **We did not determine maximum serving capacity:** output throughput was still rising at 16 workers, and the test did not demonstrate a throughput plateau.
+
+**Important limitations:** Prompts averaged **387.7 input tokens**, not the originally intended ~800. Sixteen distinct incident prompts were rotated but shared a common background and were reused, so prefix caching could affect results. Nearly every output hit the **256-token cap**, which may truncate the diagnosis; this benchmark measures bounded-length serving, not response quality. The test used the direct vLLM Service via Cloud Shell port-forward, excluding the FastAPI gateway, and used **one run per concurrency level** rather than statistical repeat trials.
+
+**Project takeaway:** On one NVIDIA L4 GPU serving Qwen3-0.6B, vLLM increased aggregate inference throughput as concurrency increased from 4 to 16, at the cost of slower responses. Selecting an operating point requires balancing throughput against a target p95 latency, rather than simply choosing the most workers.
+
 
 ### P3 Grafana screenshots — final concurrency tests
 
