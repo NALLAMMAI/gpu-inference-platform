@@ -1,44 +1,52 @@
-# Dashboard preservation status
+# GPU Inference dashboard and benchmark reproduction
 
-The exact Grafana dashboard JSON supplied by the project owner is now saved as [gpu-inference-dashboard.original.json](gpu-inference-dashboard.original.json). It contains all seven panels in Grafana's dashboard.grafana.app/v2 schema. This is configuration, not archived Prometheus time-series data.
+## Original Grafana dashboard
 
-# Monitoring dashboard and benchmark reproduction
+The original **GPU Inference** dashboard is preserved in [`gpu-inference-dashboard.original.json`](gpu-inference-dashboard.original.json). This file was copied from the dashboard JSON provided from the running Grafana instance, not reconstructed from screenshots.
 
-## Dashboard provenance
+It contains seven time-series panels:
+1. NVIDIA L4 GPU utilization
+2. NVIDIA L4 VRAM used
+3. NVIDIA L4 GPU temperature
+4. NVIDIA L4 GPU power consumption
+5. vLLM KV-cache usage
+6. vLLM running requests
+7. vLLM waiting requests
 
-`gpu-inference-dashboard.reconstructed.json` is a **reconstruction**, not an export from the user's running Grafana instance. It reproduces the seven known panel definitions and PromQL queries recorded in the project, but does not preserve exact live panel styling, history, alert rules or panel IDs.
+The JSON uses Grafana's **`dashboard.grafana.app/v2` resource schema**, with the original queries, datasource references, visualization options, and layout. It is **configuration only**; it does not preserve historical Prometheus samples.
 
-## Import in Grafana
+### Restore the dashboard
 
-1. Open **Dashboards → New → Import** in Grafana.
-2. Upload `monitoring/gpu-inference-dashboard.reconstructed.json`.
-3. Select the working **Prometheus** data source for `DS_PROMETHEUS` and import.
-4. Confirm that DCGM metrics use `job="dcgm-exporter"` and vLLM metrics use `job="learning-vllm"`. If your scrape labels differ, adjust the PromQL selectors.
+The original file is a **Grafana v2 resource JSON**, not the older classic dashboard JSON format. Grafana import support differs across versions, so a classic import dialog may not accept it directly.
 
-The VRAM panel divides `DCGM_FI_DEV_FB_USED` (MiB) by 1024 to show GiB and uses a literal suffix. The vLLM KV-cache panel multiplies a fractional occupancy by 100 to show percent.
+On a compatible Grafana version, use its supported resource import/provisioning workflow and make sure the Prometheus datasource referenced as `prometheus` is configured. If the destination only supports classic dashboard JSON, convert/export it in a compatible Grafana environment rather than assuming this file is a classic import artifact.
+
+Verify these job labels match the new Prometheus configuration:
+- DCGM Exporter: `job="dcgm-exporter"`
+- vLLM: `job="learning-vllm"`
+
+The VRAM query divides `DCGM_FI_DEV_FB_USED` (MiB) by 1024 to display GiB. The KV-cache query multiplies `vllm:kv_cache_usage_perc` by 100 to display percent.
 
 ## Re-run the benchmark
 
-With GKE context configured, start a port-forward in a dedicated terminal:
+With the GKE cluster running and your Kubernetes context configured, open a terminal for the direct vLLM port-forward:
 
 ```bash
 kubectl port-forward svc/learning-vllm 8000:8000
 ```
 
-In another terminal, from the cloned repository:
+From another terminal at the repository root:
 
 ```bash
 python3 benchmarks/final-benchmark.py | tee benchmarks/final-run-new.log
 ```
 
-The run uses three 60-second admission windows (4, 8 and 16 workers) separated by 300-second cooldowns. It writes newly observed results to `benchmarks/final-results-new.json` instead of overwriting the historical data in `benchmarks/final-results.json`.
+The benchmark uses 16 fixed incident scenarios and three concurrency levels (4, 8, and 16 workers), each with a 60-second request-admission window and 300-second cooldowns. New results are written to `benchmarks/final-results-new.json`, leaving the recorded historical results untouched.
 
-**Recorded results:** [`benchmarks/final-results.json`](../benchmarks/final-results.json) contains the metrics transcribed from the November 5, 2026 Cloud Shell output; no raw request-by-request timings or Prometheus time-series export is claimed.
+- [Recorded benchmark data](../benchmarks/final-results.json) — metrics captured from the November 5, 2026 Cloud Shell run.
+- [Analysis and Grafana screenshots](../benchmarks/exploratory-results.md) — experiment history, interpretation, limitations, and saved screenshots.
 
-**Benchmark interpretation:** [`benchmarks/exploratory-results.md`](../benchmarks/exploratory-results.md) includes the main four findings and the original Grafana screenshots.
+## Before destroying the cluster
 
-## Exact original dashboard export (recommended)
+The original dashboard **configuration is preserved in GitHub**, so no additional dashboard export is required. The historical Prometheus time series are **not** included in the dashboard JSON. Export any additional time-series measurements you want to keep before deleting the monitoring stack; the committed `stack-values.yaml` configures six-hour retention and no persistent Grafana storage.
 
-If the running cluster and Grafana are still available, additionally export the original dashboard from **Dashboard → Share / Export → Export as JSON** (menu names vary with Grafana version). Save it as `monitoring/gpu-inference-dashboard.original.json` and commit separately. That preserves the precise live panel settings rather than this reconstruction.
-
-Do not destroy the cluster until any desired Prometheus historical data and dashboard configuration have been exported. Prometheus retention in `monitoring/stack-values.yaml` is six hours and persistence is disabled.
