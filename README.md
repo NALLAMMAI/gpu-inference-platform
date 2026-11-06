@@ -2,9 +2,9 @@
 
 A hands-on learning project for deploying an **OpenAI-compatible LLM inference service** on **Google Kubernetes Engine (GKE)**, with infrastructure managed by **Terraform**, applications deployed using **Helm**, and CI/CD orchestrated through **GitHub Actions**.
 
-The platform serves **`Qwen/Qwen3-0.6B`** using **vLLM** on one **NVIDIA L4 GPU**. A **FastAPI gateway** runs separately on a CPU node and forwards inference requests to vLLM over the cluster network.
+The platform serves **`Qwen/Qwen3-0.6B`** using **vLLM** on one **NVIDIA L4 GPU**. A **FastAPI gateway** runs separately on a CPU node and forwards inference requests to vLLM over the cluster network. An optional monitoring stack uses **Prometheus**, **Grafana**, and **NVIDIA DCGM Exporter** to observe the GPU and vLLM scheduler.
 
-> **Current infrastructure status (last verified November 4, 2026):** The Terraform Destroy workflow completed successfully, and subsequent checks found no GKE clusters or Compute Engine VMs. The Terraform state bucket, repository, and GitHub-to-GCP authentication configuration were retained. Starting the platform again creates **billable cloud resources**.
+> **Infrastructure status:** A Terraform Destroy workflow and subsequent absence of GKE clusters/VMs were verified on **November 4, 2026**, but the platform was running again for **November 5 benchmarking**. Its current live/deleted status has **not been reverified** as part of this documentation update. Provisioning or keeping the platform running creates **billable cloud resources**.
 
 ## Architecture
 
@@ -57,8 +57,9 @@ The GPU pool can exist with **zero worker nodes**. CPU-only infrastructure still
 | [`terraform/`](terraform/) | GKE cluster, CPU pool, optional NVIDIA L4 GPU pool, remote-state backend |
 | [`helm/vllm/`](helm/vllm/) | vLLM Deployment and internal Service, GPU resource request and scheduling |
 | [`helm/gateway/`](helm/gateway/) | FastAPI gateway, ConfigMap-backed application code and internal Service |
-| [`benchmarks/`](benchmarks/) | Concurrency, varied-prompt and staggered-arrival load tests |
+| [`benchmarks/`](benchmarks/) | Concurrency, varied-prompt and staggered-arrival load tests, final results JSON and reproducible script |
 | [`benchmarks/README.md`](benchmarks/README.md) | Measurements, interpretation, graphs, and reproduction commands |
+| [`monitoring/`](monitoring/) | Prometheus/Grafana Helm values, DCGM Exporter, vLLM ServiceMonitor and original Grafana dashboard |
 | [`tests/`](tests/) | Inference smoke-test script |
 | [`.github/workflows/`](.github/workflows/) | Validation, provision, scale, deploy, destroy, and combined startup workflows |
 
@@ -175,16 +176,45 @@ Then in another terminal:
 curl -sS http://localhost:8000/metrics | grep -i 'num_requests'
 ```
 
-## Next milestones
+### Final incident-analysis concurrency benchmark — November 5, 2026
 
-- **GPU monitoring:** `nvidia-smi`, GPU utilization, VRAM use, and comparison at idle versus under load.
-- **KV-cache analysis:** vLLM KV-cache capacity/utilization during longer contexts and concurrency.
-- **Streaming measurements:** time to first token (TTFT), time per output token (TPOT), p50/p95 latencies.
-- **Prometheus + Grafana:** use Helm to deploy metrics collection and dashboards for vLLM; add GPU hardware metrics with a suitable exporter.
-- **Capacity and reliability:** gradual load saturation, error handling, readiness/recovery, and safer access controls.
-- Save new measurements and charts in [`benchmarks/README.md`](benchmarks/README.md).
+The final experiment used **16 rotating incident-analysis prompts** with an average input size of **387.7 tokens**, `max_tokens=256`, and no worker think time. Each worker sent one request at a time and immediately submitted another after the complete response. Tests ran for 60-second admission windows with 300-second cooldowns, **directly through a port-forward to vLLM** (bypassing the FastAPI gateway).
 
-Prometheus, Grafana, and detailed GPU monitoring are **planned**, not yet deployed.
+| Workers | Completed requests | Requests/sec | Aggregate output tokens/sec | p95 end-to-end latency | Errors |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 4 | 108 | 1.78 | 455.35 | 2.359 s | 0 |
+| 8 | 193 | 3.12 | 798.50 | 2.671 s | 0 |
+| 16 | 313 | 5.01 | 1,281.51 | 3.400 s | 0 |
+
+Aggregate output throughput grew **2.81×** from 4 to 16 workers, while p95 completion latency increased about **44%**. This is consistent with a throughput–latency tradeoff from increased concurrent inference. Sampled vLLM waiting requests remained at zero, and KV-cache occupancy was visually around 5% at 16 workers; 30-second Prometheus scrapes may miss transient waiting. **No throughput plateau or maximum-user capacity was established.**
+
+All three runs were single trials. Shared prompt prefixes and repeated scenarios may benefit from prefix caching; nearly every response reached the 256-token cap. These are bounded-output serving measurements, **not proof of incident-response quality or production capacity**.
+
+- [Detailed experimental findings and Grafana screenshots](benchmarks/exploratory-results.md)
+- [Recorded results JSON](benchmarks/final-results.json)
+- [Benchmark Python script](benchmarks/final-benchmark.py)
+
+## GPU and vLLM monitoring
+
+The benchmark environment included **Prometheus, Grafana and NVIDIA DCGM Exporter**. DCGM exposed GPU utilization, framebuffer VRAM usage, temperature and power, while vLLM exposed running requests, waiting requests and KV-cache occupancy. The original seven-panel **GPU Inference** dashboard has been preserved as Grafana's `dashboard.grafana.app/v2` JSON resource.
+
+The repository includes:
+
+- [Prometheus/Grafana stack values](monitoring/stack-values.yaml)
+- [DCGM Exporter values](monitoring/dcgm-values.yaml)
+- [vLLM ServiceMonitor](monitoring/vllm-servicemonitor.yaml)
+- [Original Grafana dashboard configuration](monitoring/gpu-inference-dashboard.original.json)
+- [Monitoring deployment and metric verification instructions](monitoring/README.md)
+
+**Reproducibility status:** The monitoring configuration reflects the setup used during the benchmark, but a **clean end-to-end rebuild from the committed files has not been verified**. The normal Start Platform workflow deploys the cluster, vLLM and gateway; it does **not currently install the monitoring stack automatically**. The original dashboard JSON preserves panel definitions and queries, not historical Prometheus samples.
+
+## Further work
+
+- Verify the committed monitoring manifests against a fresh deployment, including Prometheus scrape targets and Grafana dashboard restoration.
+- Add streaming measurements (TTFT, time per output token, p50/p95) and controlled saturation tests with varied prompts and repeated trials.
+- Consider monitoring deployment automation, reliability tests and request authentication before any broader use.
+
+The first-pass monitoring and KV-cache observation work is **complete**, with supporting measurements in [the final benchmark report](benchmarks/exploratory-results.md). Capacity limits have not yet been established.
 
 ## Shut down to control costs
 
