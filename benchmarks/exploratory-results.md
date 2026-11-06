@@ -105,7 +105,7 @@ Observed improvement from 4 to 16 workers: **2.81× higher output tokens/sec** a
 
 The test uses a 60-second request-admission window with closed-loop workers; in-flight requests are allowed to complete. A 300-second cooldown between runs helps separate monitoring periods, but does not necessarily clear the vLLM prefix cache. Per-prompt counts were fairly balanced (4 workers: 6–7 each; 8 workers: 12–13 each; 16 workers: 19–20 each). The script runs directly against the vLLM endpoint via port-forward; the CPU FastAPI gateway is not in the measured path.
 
-Because prompts share a substantial common background and the 16 prompts are reused, cache effects can inflate apparent prompt-processing throughput relative to entirely fresh prompts. Nearly all outputs hitting the 256-token cap means this benchmark primarily measures fixed-length generation performance, **not** the quality or completeness of the incident diagnoses. The final-run Grafana screenshot (November 5, 2026; approximately 19:13–19:31) showed three clearly separated load periods. Approximate visually sampled GPU utilization during those periods was 84–87%, 82–85%, and 88% for 4, 8, and 16 workers respectively. The GPU allocated VRAM line remained near 20.7 GiB. Temperature peaked around 60–61 °C and power around 71–73 W while loaded; idle power returned near 35 W and temperature near 49–50 °C between runs. These are visual estimates from Grafana's ~30-second scrape samples, **not** precise time-series maxima. A second screenshot of the same three test windows showed sampled running requests of **4, 8 and 16** respectively, matching configured worker counts. Visually estimated sampled KV-cache occupancy peaks were approximately **1–2%, 2–3% and 5%** respectively. Waiting requests remained **0 at all visible samples**. These are samples, not proof that queues never occurred between 30-second scrapes. Both Grafana screenshots are user-provided evidence but are not yet committed as image files to this repository.
+Because prompts share a substantial common background and the 16 prompts are reused, cache effects can inflate apparent prompt-processing throughput relative to entirely fresh prompts. Nearly all outputs hitting the 256-token cap means this benchmark primarily measures fixed-length generation performance, **not** the quality or completeness of the incident diagnoses. The final-run Grafana screenshot (November 5, 2026; approximately 19:13–19:31) showed three clearly separated load periods. Approximate visually sampled GPU utilization during those periods was 84–87%, 82–85%, and 88% for 4, 8, and 16 workers respectively. The GPU allocated VRAM line remained near 20.7 GiB. Temperature peaked around 60–61 °C and power around 71–73 W while loaded; idle power returned near 35 W and temperature near 49–50 °C between runs. These are visual estimates from Grafana's ~30-second scrape samples, **not** precise time-series maxima. A second screenshot of the same three test windows showed sampled running requests of **4, 8 and 16** respectively, matching configured worker counts. Visually estimated sampled KV-cache occupancy peaks were approximately **1–2%, 2–3% and 5%** respectively. Waiting requests remained **0 at all visible samples**. These are samples, not proof that queues never occurred between 30-second scrapes. Both Grafana screenshots are preserved under `benchmarks/charts/` and embedded below.
 
 ## Selected Grafana observations
 
@@ -120,4 +120,19 @@ These numbers are **individual observations**, not definitive maxima, averages o
 - P3 results are now recorded from the completed three-run benchmark on November 5, 2026. They are one run per concurrency level, not repeated trials.
 - The 5-minute cooldown separates test periods in Grafana and allows return toward idle, but does not necessarily clear vLLM's prefix cache.
 - The benchmark sends directly to the vLLM Service through a port-forward, **not** through the FastAPI gateway. Gateway overhead is not included.
+
+
+## Grafana screenshots — final concurrency tests
+
+The following screenshots were uploaded to the repository and show the three 60-second load periods separated by five-minute cooldowns (November 5, 2026).
+
+### GPU utilization, VRAM, temperature and power
+
+![GPU telemetry during 4-, 8-, and 16-worker tests](charts/gpu-performance.png)
+
+### vLLM KV-cache occupancy and scheduler requests
+
+![vLLM KV-cache, running and waiting requests during 4-, 8-, and 16-worker tests](charts/vllm-scheduler.png)
+
+The graphs are Prometheus samples, not per-request measurements; their peaks may miss values between scrapes.
 
