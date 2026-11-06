@@ -55,7 +55,26 @@ DCGM_FI_DEV_GPU_TEMP
 DCGM_FI_DEV_POWER_USAGE
 ```
 
-`DCGM_FI_DEV_FB_USED` is in MiB. The exporter and monitoring stack may need additional troubleshooting on GKE depending on driver and container runtime compatibility. The chart config is **committed but not deployed or verified**; the existing vLLM service has not been changed.
+`DCGM_FI_DEV_FB_USED` is in MiB. The exporter and monitoring stack may need additional troubleshooting on GKE depending on driver and container runtime compatibility. The monitoring configurations were committed after successful in-cluster metric scraping during the November 5, 2026 experiment. The committed templates have **not yet been redeployed and verified as a fresh installation**.
+
+## vLLM metrics scraping (reproducible)
+
+The vLLM Helm Service template at `helm/vllm/templates/service.yaml` now includes the `name: learning-vllm` Service label (when the Helm release is `learning`) and a named `http-metrics` port. These are required by the committed [vLLM ServiceMonitor](vllm-servicemonitor.yaml).
+
+After deploying the `learning` Helm release in the `default` namespace and installing `kube-prometheus-stack` with release name `monitoring` in the `monitoring` namespace, apply:
+
+```bash
+kubectl apply -f monitoring/vllm-servicemonitor.yaml
+kubectl get servicemonitor vllm -n monitoring
+kubectl get svc learning-vllm -n default --show-labels
+kubectl get svc learning-vllm -n default -o jsonpath='{.spec.ports[*].name}{"\\n"}'
+```
+
+The ServiceMonitor assumes the namespaces `default` and `monitoring`, Helm release `learning`, and Prometheus release label `monitoring`. Adjust selectors if you change these names. The vLLM exporter uses the server's existing `/metrics` endpoint on port 8000.
+
+Check Prometheus query `up{namespace="default",service="learning-vllm"}` for a value of 1. The dashboard queries expect `job="learning-vllm"` for vLLM and `job="dcgm-exporter"` for DCGM.
+
+The [original seven-panel Grafana dashboard](gpu-inference-dashboard.original.json) is preserved separately. Installing these manifests does not restore historical Prometheus metrics.
 
 ## Cleanup
 
