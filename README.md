@@ -194,6 +194,14 @@ All three runs were single trials. Shared prompt prefixes and repeated scenarios
 - [Recorded results JSON](benchmarks/final-results.json)
 - [Benchmark Python script](benchmarks/final-benchmark.py)
 
+## Interactive Grafana benchmark dashboard
+
+**[View the public Grafana snapshot — GPU Inference (November 5, 2026)](https://snapshots.raintank.io/dashboard/snapshot/9WBYMrSxAy3BhRiCADuB8eZkMJL1tYhx)**
+
+This is a **public, read-only snapshot** of the seven-panel GPU and vLLM monitoring dashboard, captured for the November 5, 2026 concurrency benchmark. It includes GPU utilization, VRAM allocation, temperature, power, KV-cache occupancy, running requests, and waiting requests. The snapshot is **historical and does not update live** or require the GKE cluster to stay running.
+
+The [original Grafana dashboard JSON](monitoring/gpu-inference-dashboard.original.json) is archived separately for restoring panel configurations. Recorded throughput and latency are in the [benchmark report](benchmarks/exploratory-results.md).
+
 ## GPU and vLLM monitoring
 
 The benchmark environment included **Prometheus, Grafana and NVIDIA DCGM Exporter**. DCGM exposed GPU utilization, framebuffer VRAM usage, temperature and power, while vLLM exposed running requests, waiting requests and KV-cache occupancy. The original seven-panel **GPU Inference** dashboard has been preserved as Grafana's `dashboard.grafana.app/v2` JSON resource.
