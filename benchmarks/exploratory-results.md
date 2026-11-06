@@ -20,6 +20,8 @@ Test 2 combines two repeated runs (shown as ranges); Tests 3 and 4 use the same 
 
 ## Prompt definitions
 
+
+
 ### P1 — short identical prompt
 
 Every worker sends this exact input repeatedly:
@@ -54,15 +56,7 @@ prompt = context + "\nSummarize the key ideas."
 
 The same prompt is reused by each worker for multiple requests. These repetitions and potential prefix-cache reuse make P2 a synthetic input-length stress test rather than a representative user workload.
 
-### P3 — incident-analysis prompt pool (completed final benchmark)
-
-A pool of 16 fictional incidents: GPU saturation, KV-cache pressure, slow prefill, slow decoding, Pending GPU Pods, GPU OOM, low GPU activity, traffic bursts, uneven replicas, failed deployment, GPU temperature, missing Prometheus metrics, gateway timeouts, low prefix-cache benefits, concurrency plateau, and high inference cost.
-
-Each prompt includes the incident's distinct symptoms, shared Kubernetes/vLLM infrastructure context, and the task of identifying root causes, proposing diagnostic checks and mitigations. A shared rotation assigns prompts across workers; no worker permanently owns a scenario. As prompts recur, prefix caching may still influence results.
-
-Completed P3 test settings: **4, 8, 16 workers; 60-second target test duration each; 300-second cooldowns**. The actual elapsed times were 60.70, 61.87 and 62.52 seconds, respectively; requests in progress completed after the nominal deadline.
-
-## More detailed measured results (P2, Test 4)
+### P2 detailed measured results (P2, Test 4)
 
 | Metric | Value |
 | --- | ---: |
@@ -82,8 +76,21 @@ Completed P3 test settings: **4, 8, 16 workers; 60-second target test duration e
 
 These are **aggregate** throughput measurements across concurrent requests, not the per-request decoding speed. Input tokens/sec counts submitted prompt tokens, not necessarily fresh GPU prefill computations when prefix caching is enabled.
 
+### P2 exploratory Grafana observations
 
-## Final incident-analysis concurrency comparison (P3, Test 5)
+During the exploratory load tests, sampled measurements included GPU utilization around 83–85%, allocated VRAM around 20.7 GiB, GPU temperature around 60–62 °C under load (49 °C idle), and power around 71–72 W under load (35 W idle). KV-cache occupancy was sampled at 2.91% in one long-prompt test and 3.72% in a later test; the later snapshot showed seven running requests and zero waiting requests.
+
+These numbers are **individual observations**, not definitive maxima, averages or continuous measurements. Prometheus' ~30-second scrape interval can miss short spikes, and the captured screenshots/series have not all been archived here.
+
+### P3 — incident-analysis prompt pool (completed final benchmark)
+
+A pool of 16 fictional incidents: GPU saturation, KV-cache pressure, slow prefill, slow decoding, Pending GPU Pods, GPU OOM, low GPU activity, traffic bursts, uneven replicas, failed deployment, GPU temperature, missing Prometheus metrics, gateway timeouts, low prefix-cache benefits, concurrency plateau, and high inference cost.
+
+Each prompt includes the incident's distinct symptoms, shared Kubernetes/vLLM infrastructure context, and the task of identifying root causes, proposing diagnostic checks and mitigations. A shared rotation assigns prompts across workers; no worker permanently owns a scenario. As prompts recur, prefix caching may still influence results.
+
+Completed P3 test settings: **4, 8, 16 workers; 60-second target test duration each; 300-second cooldowns**. The actual elapsed times were 60.70, 61.87 and 62.52 seconds, respectively; requests in progress completed after the nominal deadline.
+
+### Final incident-analysis concurrency comparison (P3, Test 5)
 
 All three runs completed successfully. Prompts were selected in a rotating sequence from 16 fictional incidents, each with a shared system-background section. Individual prompts averaged about 388 tokens; this is **shorter than the originally discussed ~800-token goal**. Output was capped at 256 tokens; mean generated tokens per request were 255.9, 256.0 and 256.0, so nearly all responses reached the cap.
 
@@ -107,22 +114,7 @@ The test uses a 60-second request-admission window with closed-loop workers; in-
 
 Because prompts share a substantial common background and the 16 prompts are reused, cache effects can inflate apparent prompt-processing throughput relative to entirely fresh prompts. Nearly all outputs hitting the 256-token cap means this benchmark primarily measures fixed-length generation performance, **not** the quality or completeness of the incident diagnoses. The final-run Grafana screenshot (November 5, 2026; approximately 19:13–19:31) showed three clearly separated load periods. Approximate visually sampled GPU utilization during those periods was 84–87%, 82–85%, and 88% for 4, 8, and 16 workers respectively. The GPU allocated VRAM line remained near 20.7 GiB. Temperature peaked around 60–61 °C and power around 71–73 W while loaded; idle power returned near 35 W and temperature near 49–50 °C between runs. These are visual estimates from Grafana's ~30-second scrape samples, **not** precise time-series maxima. A second screenshot of the same three test windows showed sampled running requests of **4, 8 and 16** respectively, matching configured worker counts. Visually estimated sampled KV-cache occupancy peaks were approximately **1–2%, 2–3% and 5%** respectively. Waiting requests remained **0 at all visible samples**. These are samples, not proof that queues never occurred between 30-second scrapes. Both Grafana screenshots are preserved under `benchmarks/charts/` and embedded below.
 
-## Selected Grafana observations
-
-During the exploratory load tests, sampled measurements included GPU utilization around 83–85%, allocated VRAM around 20.7 GiB, GPU temperature around 60–62 °C under load (49 °C idle), and power around 71–72 W under load (35 W idle). KV-cache occupancy was sampled at 2.91% in one long-prompt test and 3.72% in a later test; the later snapshot showed seven running requests and zero waiting requests.
-
-These numbers are **individual observations**, not definitive maxima, averages or continuous measurements. Prometheus' ~30-second scrape interval can miss short spikes, and the captured screenshots/series have not all been archived here.
-
-## Interpretation and limitations
-
-- Different workloads have different input lengths, output lengths and caching patterns. Requests/sec across P1 and P2 should **not** be used to claim one is more efficient on a like-for-like basis.
-- Two short-prompt eight-worker runs showed 3.56 and 3.62 requests/sec, modest run-to-run variation.
-- P3 results are now recorded from the completed three-run benchmark on November 5, 2026. They are one run per concurrency level, not repeated trials.
-- The 5-minute cooldown separates test periods in Grafana and allows return toward idle, but does not necessarily clear vLLM's prefix cache.
-- The benchmark sends directly to the vLLM Service through a port-forward, **not** through the FastAPI gateway. Gateway overhead is not included.
-
-
-## Interpretation: concurrency, user capacity, and serving efficiency
+### Interpreting P3: concurrency, user capacity, and serving efficiency
 
 ### What does a benchmark worker represent?
 
@@ -174,8 +166,7 @@ That **does not establish a maximum of 16 users**. A production capacity claim r
 
 **Engineering conclusion:** For this controlled incident-analysis workload, vLLM on a single L4 showed improving aggregate throughput as active concurrency increased from 4 to 16, with a measurable increase in per-request latency and without visible sustained queueing or KV-cache exhaustion. Selecting a production concurrency target requires a latency SLO and additional representative workload testing.
 
-
-## Grafana screenshots — final concurrency tests
+### P3 Grafana screenshots — final concurrency tests
 
 The following screenshots were uploaded to the repository and show the three 60-second load periods separated by five-minute cooldowns (November 5, 2026).
 
@@ -189,3 +180,10 @@ The following screenshots were uploaded to the repository and show the three 60-
 
 The graphs are Prometheus samples, not per-request measurements; their peaks may miss values between scrapes.
 
+## Cross-experiment limitations
+
+- Different workloads have different input lengths, output lengths and caching patterns. Requests/sec across P1 and P2 should **not** be used to claim one is more efficient on a like-for-like basis.
+- Two short-prompt eight-worker runs showed 3.56 and 3.62 requests/sec, modest run-to-run variation.
+- P3 results are now recorded from the completed three-run benchmark on November 5, 2026. They are one run per concurrency level, not repeated trials.
+- The 5-minute cooldown separates test periods in Grafana and allows return toward idle, but does not necessarily clear vLLM's prefix cache.
+- The benchmark sends directly to the vLLM Service through a port-forward, **not** through the FastAPI gateway. Gateway overhead is not included.
