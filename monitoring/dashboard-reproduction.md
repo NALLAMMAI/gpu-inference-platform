@@ -1,3 +1,7 @@
+# Dashboard preservation status
+
+The exact Grafana dashboard JSON supplied by the project owner is now saved as [gpu-inference-dashboard.original.json](gpu-inference-dashboard.original.json). It contains all seven panels in Grafana's dashboard.grafana.app/v2 schema. This is configuration, not archived Prometheus time-series data.
+
 # Monitoring dashboard and benchmark reproduction
 
 ## Dashboard provenance
