@@ -7,7 +7,10 @@ MODEL="${MODEL:-Qwen/Qwen3-0.6B}"
 RESULT_DIR="${RESULT_DIR:-benchmarks/final-benchmark/results}"
 mkdir -p "$RESULT_DIR"
 
-for c in 1 2 4 8 16 32; do
+CONCURRENCY_LEVELS=(1 2 4 8 16 32)
+COOLDOWN_SECONDS=180
+for i in "${!CONCURRENCY_LEVELS[@]}"; do
+  c="${CONCURRENCY_LEVELS[$i]}"
   echo "Starting synthetic sweep concurrency=$c"
   vllm bench serve \
     --backend openai-chat \
@@ -24,5 +27,11 @@ for c in 1 2 4 8 16 32; do
     --save-result \
     --result-dir "$RESULT_DIR" \
     --result-filename "concurrency-$c.json"
+
+  # Rest for three minutes between runs, but not after the final run.
+  if (( i < ${#CONCURRENCY_LEVELS[@]} - 1 )); then
+    echo "Cooldown: waiting ${COOLDOWN_SECONDS}s before next concurrency test..."
+    sleep "$COOLDOWN_SECONDS"
+  fi
 done
 echo "Complete: $RESULT_DIR"
