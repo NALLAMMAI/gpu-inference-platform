@@ -6,7 +6,7 @@ It does not change the original monitoring dashboard or old benchmark measuremen
 ## Data flow
 
 1. `vllm bench serve` sends synthetic *streaming* chat traffic and saves JSON.
-2. `publish-metrics.py` generates `summary.csv` and pushes a completed sweep to Pushgateway.
+2. After **each concurrency test**, `publish-metrics.py` refreshes `summary.csv` and pushes all completed test results to Pushgateway (before the 3-minute cooldown).
 3. Prometheus scrapes Pushgateway through the Helm chart's ServiceMonitor.
 4. Prometheus also scrapes the existing DCGM Exporter and vLLM /metrics targets.
 5. Grafana displays benchmark comparisons and live GPU metrics on one dashboard.
@@ -44,7 +44,7 @@ kubectl port-forward svc/learning-vllm 8000:8000
 bash benchmarks/final-benchmark/run-concurrency-sweep.sh
 ```
 
-The script tests max concurrency 1, 2, 4, 8, 16 and 32 at a fixed prompt count.
+The script tests max concurrency 1, 2, 4, 8, 16 and 32 at a fixed prompt count, with a 180-second cooldown between tests. The GitHub Actions benchmark Pod sets `PUSHGATEWAY_URL`, `PUBLISH_RUN_ID`, and `PUBLISHER_SCRIPT` so every completed test is published immediately. When running the script locally without those variables, it only updates the CSV.
 `--max-concurrency` limits clients in flight; it is **not actual scheduler batch size**.
 It uses streaming results so TPOT is measurable. Random inputs are synthetic,
 and model output lengths may differ from the requested length. Warmups and
