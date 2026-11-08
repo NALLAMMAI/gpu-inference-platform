@@ -93,9 +93,6 @@ jobs:
                 trap 'touch /results/FAILED; sleep 1200' ERR
                 python3 -m pip install -q prometheus-client
                 bash /scripts/run-concurrency-sweep.sh
-                python3 /scripts/publish-metrics.py --results-dir /results \
-                  --run-id "${RUN_ID}" \
-                  --gateway benchmark-pushgateway.monitoring.svc.cluster.local:9091
                 touch /results/SUCCESS
                 sleep 1200
               env:
@@ -105,6 +102,12 @@ jobs:
                 value: Qwen/Qwen3-0.6B
               - name: RESULT_DIR
                 value: /results
+              - name: PUBLISH_RUN_ID
+                value: "${RUN_ID}"
+              - name: PUSHGATEWAY_URL
+                value: benchmark-pushgateway.monitoring.svc.cluster.local:9091
+              - name: PUBLISHER_SCRIPT
+                value: /scripts/publish-metrics.py
               resources:
                 requests: {cpu: 250m, memory: 1Gi}
                 limits: {cpu: "1", memory: 3Gi}
