@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Archive vLLM bench serve outputs in CSV and push a complete sweep to Pushgateway.
+"""Archive available vLLM bench serve outputs in CSV and refresh Pushgateway after each test.
 
-Run after the benchmark sweep. Results stay archived in JSON and CSV even if
+Run after each completed test (or the full sweep). Results stay archived in JSON and CSV even if
 Prometheus/Pushgateway are later destroyed. Requires: pip install prometheus-client
 
 Example:
-  python3 benchmarks/publish-metrics.py --results-dir benchmarks/final-benchmark/results \
+  python3 benchmarks/final-benchmark/publish-metrics.py --results-dir benchmarks/final-benchmark/results \
     --run-id l4-qwen-20261108 --gateway localhost:9091
 
 Security: port-forward Pushgateway locally; do not expose it publicly.
