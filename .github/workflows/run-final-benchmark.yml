@@ -1,0 +1,156 @@
+name: Run Final vLLM Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type RUN_BENCHMARK; requires existing billable GPU node and vLLM"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-gke-state
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    if: "${{ inputs.confirmation == 'RUN_BENCHMARK' }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BENCH_POD: final-vllm-bench-${{ github.run_id }}
+      RUN_ID: l4-qwen-${{ github.run_id }}
+      RESULTS: benchmarks/final-benchmark/results
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: gke-gcloud-auth-plugin
+      - name: Connect to existing GKE cluster
+        run: |
+          gcloud container clusters get-credentials gpu-inference-learning \
+            --zone us-central1-a --project "${{ vars.GCP_PROJECT_ID }}"
+      - name: Confirm GPU node and vLLM are ready (no resources created)
+        run: |
+          set -euo pipefail
+          kubectl get nodes -o wide
+          kubectl wait --for=condition=Ready node \
+            -l cloud.google.com/gke-nodepool=gpu-l4-pool --timeout=30s
+          kubectl rollout status deployment/learning-vllm --timeout=45s
+          kubectl get svc learning-vllm
+      - uses: azure/setup-helm@v4
+      - name: Install monitoring and Pushgateway
+        run: |
+          set -euo pipefail
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add gpu-helm-charts https://nvidia.github.io/dcgm-exporter/helm-charts
+          helm repo update
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+            -n monitoring -f monitoring/stack-values.yaml --wait --timeout 12m
+          kubectl apply -f monitoring/vllm-servicemonitor.yaml
+          helm upgrade --install dcgm-exporter gpu-helm-charts/dcgm-exporter \
+            -n monitoring -f monitoring/dcgm-values.yaml --wait --timeout 8m
+          helm upgrade --install benchmark-pushgateway prometheus-community/prometheus-pushgateway \
+            -n monitoring -f benchmarks/final-benchmark/pushgateway-values.yaml \
+            --wait --timeout 6m
+      - name: Start official vLLM bench serve on CPU node
+        run: |
+          set -euo pipefail
+          kubectl create configmap "${BENCH_POD}-scripts" \
+            --from-file=run-concurrency-sweep.sh=benchmarks/final-benchmark/run-concurrency-sweep.sh \
+            --from-file=publish-metrics.py=benchmarks/final-benchmark/publish-metrics.py \
+            --dry-run=client -o yaml | kubectl apply -f -
+          cat > /tmp/bench-pod.yaml <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: ${BENCH_POD}
+          spec:
+            restartPolicy: Never
+            nodeSelector:
+              cloud.google.com/gke-nodepool: cpu-pool
+            containers:
+            - name: benchmark
+              image: vllm/vllm-openai:v0.11.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/bash", "-lc"]
+              args:
+              - |
+                set -Eeuo pipefail
+                trap 'touch /results/FAILED; sleep 1200' ERR
+                python3 -m pip install -q prometheus-client
+                bash /scripts/run-concurrency-sweep.sh
+                python3 /scripts/publish-metrics.py --results-dir /results \
+                  --run-id "${RUN_ID}" \
+                  --gateway benchmark-pushgateway.monitoring.svc.cluster.local:9091
+                touch /results/SUCCESS
+                sleep 1200
+              env:
+              - name: BASE_URL
+                value: http://learning-vllm.default.svc.cluster.local:8000
+              - name: MODEL
+                value: Qwen/Qwen3-0.6B
+              - name: RESULT_DIR
+                value: /results
+              resources:
+                requests: {cpu: 250m, memory: 1Gi}
+                limits: {cpu: "1", memory: 3Gi}
+              volumeMounts:
+              - {name: scripts, mountPath: /scripts}
+              - {name: results, mountPath: /results}
+            volumes:
+            - name: scripts
+              configMap:
+                name: ${BENCH_POD}-scripts
+            - name: results
+              emptyDir: {}
+          EOF
+          kubectl apply -f /tmp/bench-pod.yaml
+          kubectl wait pod/"${BENCH_POD}" --for=condition=Ready --timeout=12m
+      - name: Wait for benchmark and Pushgateway publishing
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 210); do
+            if kubectl exec "${BENCH_POD}" -- test -f /results/SUCCESS; then
+              kubectl logs "${BENCH_POD}" --tail=70
+              exit 0
+            fi
+            if kubectl exec "${BENCH_POD}" -- test -f /results/FAILED; then
+              kubectl logs "${BENCH_POD}" --tail=150
+              exit 1
+            fi
+            sleep 20
+          done
+          kubectl logs "${BENCH_POD}" --tail=150 || true
+          exit 1
+      - name: Copy JSON and CSV results
+        if: always()
+        run: |
+          mkdir -p "$RESULTS"
+          kubectl cp "default/${BENCH_POD}:/results/." "$RESULTS" -c benchmark || true
+      - name: Archive JSON and CSV as GitHub artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-vllm-benchmark-${{ github.run_id }}
+          path: benchmarks/final-benchmark/results/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Clean up client Pod
+        if: always()
+        run: |
+          kubectl delete pod "$BENCH_POD" --ignore-not-found --wait=false || true
+          kubectl delete configmap "${BENCH_POD}-scripts" --ignore-not-found || true
