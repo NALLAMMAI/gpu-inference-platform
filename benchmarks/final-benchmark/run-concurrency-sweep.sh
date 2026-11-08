@@ -28,6 +28,21 @@ for i in "${!CONCURRENCY_LEVELS[@]}"; do
     --result-dir "$RESULT_DIR" \
     --result-filename "concurrency-$c.json"
 
+  # Update the CSV and Pushgateway after each completed concurrency test.
+  # push_to_gateway replaces this run_id group with all results collected so far.
+  if [[ -n "${PUSHGATEWAY_URL:-}" ]]; then
+    python3 "${PUBLISHER_SCRIPT:-/scripts/publish-metrics.py}" \
+      --results-dir "$RESULT_DIR" \
+      --run-id "${PUBLISH_RUN_ID:?PUBLISH_RUN_ID is required}" \
+      --gateway "$PUSHGATEWAY_URL"
+  else
+    echo "Pushgateway not configured; updating local CSV only."
+    python3 "${PUBLISHER_SCRIPT:-benchmarks/final-benchmark/publish-metrics.py}" \
+      --results-dir "$RESULT_DIR" \
+      --run-id "${PUBLISH_RUN_ID:-local-sweep}" \
+      --archive-only
+  fi
+
   # Rest for three minutes between runs, but not after the final run.
   if (( i < ${#CONCURRENCY_LEVELS[@]} - 1 )); then
     echo "Cooldown: waiting ${COOLDOWN_SECONDS}s before next concurrency test..."
