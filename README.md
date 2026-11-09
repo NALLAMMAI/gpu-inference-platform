@@ -8,7 +8,7 @@ The platform serves **`Qwen/Qwen3-0.6B`** using **vLLM** on one **NVIDIA L4 GPU*
 
 ## Architecture
 
-![GKE node pools and monitoring architecture](docs/gke-node-pools-architecture.svg)
+![GKE CPU and GPU Node Pool Architecture](docs/gke-architecture.png)
 
 The diagram shows the current **single-GPU benchmark layout**: the FastAPI gateway and monitoring stack run in the CPU node pool, while vLLM and the temporary `vllm bench serve` client run inside the **same `learning-vllm` pod** on the L4 GPU node. The client primarily generates HTTP traffic using CPU, while the model server uses the NVIDIA L4 for inference. The cluster namespaces (`default` and `monitoring`) are logical groupings; node-pool selection and scheduling determine where workloads execute.
 
