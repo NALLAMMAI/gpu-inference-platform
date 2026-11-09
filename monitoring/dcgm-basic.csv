@@ -1,0 +1,4 @@
+DCGM_FI_DEV_GPU_UTIL, gauge, GPU utilization
+DCGM_FI_DEV_FB_USED, gauge, GPU framebuffer memory used
+DCGM_FI_DEV_GPU_TEMP, gauge, GPU temperature
+DCGM_FI_DEV_POWER_USAGE, gauge, GPU power usage
