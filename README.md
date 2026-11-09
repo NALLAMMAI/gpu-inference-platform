@@ -212,7 +212,7 @@ All three runs were single trials. Shared prompt prefixes and repeated scenarios
 
 The **November 8, 2026** benchmark ran the official `vllm bench serve` client inside the `learning-vllm` pod on the NVIDIA L4 node, targeting `127.0.0.1:8000/v1/chat/completions` (not the FastAPI gateway). **Only one GPU was used.** The GitHub-hosted Actions runner was CPU-only and coordinated `kubectl exec`, copied result files, and published CSV-derived metrics to the in-cluster Pushgateway; it did not execute model inference or require an external GPU/self-hosted runner. It used **128 requests at each of six concurrency levels** (768/768 completed), synthetic requests of **512 input tokens** and **256 output tokens**, with approximately **180 seconds between levels**. Results were published to Pushgateway, collected in Prometheus, and visualized in Grafana. The co-located client may consume GPU-node CPU/RAM, so these figures should not be interpreted as isolated server-only capacity.
 
-| Concurrent requests | Output tokens/s | Requests/s | Mean TTFT (ms) | P95 TTFT (ms) | Mean TPOT (ms) | P95 TPOT (ms) |
+| Concurrent requests | Output throughput (output tok/s) | Request throughput (requests/s) | Mean TTFT (ms) | P95 TTFT (ms) | Mean TPOT (ms) | P95 TPOT (ms) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 | 132.87 | 0.52 | 60.36 | 69.01 | 7.32 | 7.39 |
 | 2 | 252.97 | 0.99 | 47.36 | 58.02 | 7.74 | 7.84 |
