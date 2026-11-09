@@ -1149,7 +1149,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "inference_benchmark_mean_ttft_ms{run_id=\"$benchmark_run\"}",
+                        "expr": "label_replace(inference_benchmark_mean_ttft_ms{run_id=\"$benchmark_run\"}, \"stat\", \"Mean TTFT\", \"__name__\", \".*\") or label_replace(inference_benchmark_p95_ttft_ms{run_id=\"$benchmark_run\"}, \"stat\", \"P95 TTFT\", \"__name__\", \".*\")",
                         "legendFormat": "{{concurrency}}",
                         "range": false,
                         "instant": true,
@@ -1158,29 +1158,6 @@
                       "version": "v0"
                     },
                     "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "inference_benchmark_p95_ttft_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "{{concurrency}}",
-                        "range": false,
-                        "instant": true,
-                        "format": "table"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
                   }
                 }
               ],
@@ -1192,16 +1169,19 @@
                     "include": {
                       "names": [
                         "concurrency",
+                        "stat",
                         "Value"
                       ]
                     }
                   }
                 },
                 {
-                  "id": "joinByField",
+                  "id": "groupingToMatrix",
                   "options": {
-                    "byField": "concurrency",
-                    "mode": "outerTabular"
+                    "columnField": "stat",
+                    "rowField": "concurrency",
+                    "valueField": "Value",
+                    "emptyValue": "null"
                   }
                 },
                 {
@@ -1225,30 +1205,11 @@
                       }
                     ]
                   }
-                },
-                {
-                  "id": "organize",
-                  "options": {
-                    "excludeByName": {
-                      "Time": true,
-                      "Time 1": true,
-                      "Time 2": true
-                    },
-                    "renameByName": {
-                      "Value #A": "Mean TTFT",
-                      "Value #B": "P95 TTFT",
-                      "Value 1": "Mean TTFT",
-                      "Value 2": "P95 TTFT"
-                    },
-                    "indexByName": {
-                      "concurrency": 0
-                    }
-                  }
                 }
               ]
             }
           },
-          "description": "Completed benchmark measurements indexed by concurrency (1, 2, 4, 8, 16, 32); independent of publication time. Run selection uses the Benchmark run ID control.",
+          "description": "Single-query instant vector with a stat label and Grafana matrix transform; plots Mean and P95 TTFT against concurrency.",
           "id": 10,
           "links": [],
           "title": "TTFT vs concurrency — Mean and P95",
@@ -1331,7 +1292,7 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}",
+                        "expr": "label_replace(inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}, \"stat\", \"Mean TPOT\", \"__name__\", \".*\") or label_replace(inference_benchmark_p95_tpot_ms{run_id=\"$benchmark_run\"}, \"stat\", \"P95 TPOT\", \"__name__\", \".*\")",
                         "legendFormat": "{{concurrency}}",
                         "range": false,
                         "instant": true,
@@ -1340,29 +1301,6 @@
                       "version": "v0"
                     },
                     "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "prometheus"
-                      },
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "inference_benchmark_p95_tpot_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "{{concurrency}}",
-                        "range": false,
-                        "instant": true,
-                        "format": "table"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
                   }
                 }
               ],
@@ -1374,16 +1312,19 @@
                     "include": {
                       "names": [
                         "concurrency",
+                        "stat",
                         "Value"
                       ]
                     }
                   }
                 },
                 {
-                  "id": "joinByField",
+                  "id": "groupingToMatrix",
                   "options": {
-                    "byField": "concurrency",
-                    "mode": "outerTabular"
+                    "columnField": "stat",
+                    "rowField": "concurrency",
+                    "valueField": "Value",
+                    "emptyValue": "null"
                   }
                 },
                 {
@@ -1407,30 +1348,11 @@
                       }
                     ]
                   }
-                },
-                {
-                  "id": "organize",
-                  "options": {
-                    "excludeByName": {
-                      "Time": true,
-                      "Time 1": true,
-                      "Time 2": true
-                    },
-                    "renameByName": {
-                      "Value #A": "Mean TPOT",
-                      "Value #B": "P95 TPOT",
-                      "Value 1": "Mean TPOT",
-                      "Value 2": "P95 TPOT"
-                    },
-                    "indexByName": {
-                      "concurrency": 0
-                    }
-                  }
                 }
               ]
             }
           },
-          "description": "Completed benchmark measurements indexed by concurrency (1, 2, 4, 8, 16, 32); independent of publication time. Run selection uses the Benchmark run ID control.",
+          "description": "Single-query instant vector with a stat label and Grafana matrix transform; plots Mean and P95 TPOT against concurrency.",
           "id": 11,
           "links": [],
           "title": "TPOT vs concurrency — Mean and P95",
