@@ -4,7 +4,7 @@ A hands-on learning project for deploying an **OpenAI-compatible LLM inference s
 
 The platform serves **`Qwen/Qwen3-0.6B`** using **vLLM** on one **NVIDIA L4 GPU**. A **FastAPI gateway** runs separately on a CPU node and forwards inference requests to vLLM over the cluster network. An optional monitoring stack uses **Prometheus**, **Grafana**, and **NVIDIA DCGM Exporter** to observe the GPU and vLLM scheduler.
 
-> **Infrastructure status:** A Terraform Destroy workflow and subsequent absence of GKE clusters/VMs were verified on **November 4, 2026**, but the platform was running again for **November 5 benchmarking**. Its current live/deleted status has **not been reverified** as part of this documentation update. Provisioning or keeping the platform running creates **billable cloud resources**.
+> **Infrastructure lifecycle:** The GKE cluster and NVIDIA L4 GPU resources are provisioned on demand using Terraform and GitHub Actions. After benchmarking, the infrastructure can be destroyed to avoid ongoing GPU and compute costs. Benchmark results, Grafana dashboard configurations, and deployment manifests are preserved in GitHub for reproducibility.
 
 ## Architecture
 
