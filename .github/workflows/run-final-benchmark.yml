@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type RUN_BENCHMARK; requires existing billable GPU node and vLLM"
+        description: "Type RUN_BENCHMARK; requires running GKE vLLM and a separate registered GPU runner"
         required: true
         type: string
 
@@ -18,13 +18,14 @@ concurrency:
 jobs:
   benchmark:
     if: "${{ inputs.confirmation == 'RUN_BENCHMARK' }}"
-    runs-on: ubuntu-latest
+    # Register a separate GPU-equipped machine (e.g. RunPod) with this label.
+    # The GPU node serving vLLM on GKE stays unchanged.
+    runs-on: [self-hosted, linux, x64, gpu-benchmark]
     timeout-minutes: 100
     permissions:
       contents: read
       id-token: write
     env:
-      BENCH_POD: final-vllm-bench-${{ github.run_id }}
       RUN_ID: l4-qwen-${{ github.run_id }}
       RESULTS: benchmarks/final-benchmark/results
     steps:
@@ -69,84 +70,53 @@ jobs:
           helm upgrade --install benchmark-pushgateway prometheus-community/prometheus-pushgateway \
             -n monitoring -f benchmarks/final-benchmark/pushgateway-values.yaml \
             --wait --timeout 6m
-      - name: Start official vLLM bench serve on CPU node
+      - name: Verify separate GPU benchmark runner
         run: |
           set -euo pipefail
-          kubectl create configmap "${BENCH_POD}-scripts" \
-            --from-file=run-concurrency-sweep.sh=benchmarks/final-benchmark/run-concurrency-sweep.sh \
-            --from-file=publish-metrics.py=benchmarks/final-benchmark/publish-metrics.py \
-            --dry-run=client -o yaml | kubectl apply -f -
-          cat > /tmp/bench-pod.yaml <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: ${BENCH_POD}
-          spec:
-            restartPolicy: Never
-            nodeSelector:
-              cloud.google.com/gke-nodepool: cpu-pool
-            containers:
-            - name: benchmark
-              image: vllm/vllm-openai:v0.11.0
-              imagePullPolicy: IfNotPresent
-              command: ["/bin/bash", "-lc"]
-              args:
-              - |
-                set -Eeuo pipefail
-                trap 'touch /results/FAILED; sleep 1200' ERR
-                python3 -m pip install -q prometheus-client
-                bash /scripts/run-concurrency-sweep.sh
-                touch /results/SUCCESS
-                sleep 1200
-              env:
-              - name: BASE_URL
-                value: http://learning-vllm.default.svc.cluster.local:8000
-              - name: MODEL
-                value: Qwen/Qwen3-0.6B
-              - name: RESULT_DIR
-                value: /results
-              - name: PUBLISH_RUN_ID
-                value: "${RUN_ID}"
-              - name: PUSHGATEWAY_URL
-                value: benchmark-pushgateway.monitoring.svc.cluster.local:9091
-              - name: PUBLISHER_SCRIPT
-                value: /scripts/publish-metrics.py
-              resources:
-                requests: {cpu: 250m, memory: 1Gi}
-                limits: {cpu: "1", memory: 3Gi}
-              volumeMounts:
-              - {name: scripts, mountPath: /scripts}
-              - {name: results, mountPath: /results}
-            volumes:
-            - name: scripts
-              configMap:
-                name: ${BENCH_POD}-scripts
-            - name: results
-              emptyDir: {}
-          EOF
-          kubectl apply -f /tmp/bench-pod.yaml
-          kubectl wait pod/"${BENCH_POD}" --for=condition=Ready --timeout=12m
-      - name: Wait for benchmark and Pushgateway publishing
+          nvidia-smi
+          command -v vllm
+          command -v python3
+          command -v kubectl
+          vllm --version
+          python3 -m pip install -q prometheus-client
+          echo "Benchmark is running outside GKE on a dedicated GPU-enabled self-hosted runner."
+      - name: Run official vLLM bench serve via authenticated GKE tunnels
+        env:
+          BASE_URL: http://127.0.0.1:8000
+          MODEL: Qwen/Qwen3-0.6B
+          RESULT_DIR: benchmarks/final-benchmark/results
+          PUSHGATEWAY_URL: 127.0.0.1:9091
+          PUBLISHER_SCRIPT: benchmarks/final-benchmark/publish-metrics.py
+          PUBLISH_RUN_ID: ${{ env.RUN_ID }}
         run: |
           set -euo pipefail
-          for i in $(seq 1 210); do
-            if kubectl exec "${BENCH_POD}" -- test -f /results/SUCCESS; then
-              kubectl logs "${BENCH_POD}" --tail=70
-              exit 0
+          mkdir -p "$RESULT_DIR"
+
+          # Tunnels are bound only to the runner's loopback interface;
+          # neither the vLLM service nor Pushgateway is publicly exposed.
+          kubectl port-forward -n default svc/learning-vllm 8000:8000 \
+            --address=127.0.0.1 > /tmp/vllm-portforward.log 2>&1 &
+          VLLM_PF=$!
+          kubectl port-forward -n monitoring svc/benchmark-pushgateway-prometheus-pushgateway 9091:9091 \
+            --address=127.0.0.1 > /tmp/pushgateway-portforward.log 2>&1 &
+          PUSH_PF=$!
+          trap 'kill "$VLLM_PF" "$PUSH_PF" 2>/dev/null || true' EXIT
+
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 3 http://127.0.0.1:8000/v1/models >/dev/null &&
+               curl -fsS --max-time 3 http://127.0.0.1:9091/-/healthy >/dev/null; then
+              ready=1
+              break
             fi
-            if kubectl exec "${BENCH_POD}" -- test -f /results/FAILED; then
-              kubectl logs "${BENCH_POD}" --tail=150
-              exit 1
-            fi
-            sleep 20
+            sleep 3
           done
-          kubectl logs "${BENCH_POD}" --tail=150 || true
-          exit 1
-      - name: Copy JSON and CSV results
-        if: always()
-        run: |
-          mkdir -p "$RESULTS"
-          kubectl cp "default/${BENCH_POD}:/results/." "$RESULTS" -c benchmark || true
+          if [[ "$ready" -ne 1 ]]; then
+            cat /tmp/vllm-portforward.log /tmp/pushgateway-portforward.log
+            exit 1
+          fi
+
+          bash benchmarks/final-benchmark/run-concurrency-sweep.sh
       - name: Archive JSON and CSV as GitHub artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,8 +125,3 @@ jobs:
           path: benchmarks/final-benchmark/results/
           if-no-files-found: warn
           retention-days: 30
-      - name: Clean up client Pod
-        if: always()
-        run: |
-          kubectl delete pod "$BENCH_POD" --ignore-not-found --wait=false || true
-          kubectl delete configmap "${BENCH_POD}-scripts" --ignore-not-found || true
