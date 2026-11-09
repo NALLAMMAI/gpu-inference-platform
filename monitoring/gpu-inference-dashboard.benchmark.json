@@ -1166,142 +1166,16 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "inference_benchmark_mean_ttft_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "Mean TTFT",
-                        "range": false,
+                        "format": "table",
                         "instant": true,
-                        "format": "table"
+                        "legendFormat": "Mean TTFT",
+                        "range": false
                       },
                       "version": "v0"
                     },
                     "refId": "A"
                   }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "number"
-                      }
-                    ]
-                  }
                 },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "concurrency",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "id": "organize",
-                  "options": {
-                    "renameByName": {
-                      "Value": "Mean TTFT"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "One value per concurrency level for the selected benchmark run. X-axis is numeric concurrent requests.",
-          "id": 10,
-          "links": [],
-          "title": "Mean TTFT vs concurrency",
-          "vizConfig": {
-            "group": "trend",
-            "kind": "VizConfig",
-            "version": "13.3.0",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "unit": "ms",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "custom": {
-                    "drawStyle": "line",
-                    "lineWidth": 2,
-                    "showPoints": "always",
-                    "pointSize": 5,
-                    "fillOpacity": 0
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "concurrency"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "none"
-                      },
-                      {
-                        "id": "min",
-                        "value": 0
-                      },
-                      {
-                        "id": "max",
-                        "value": 50
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "xField": "concurrency",
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              }
-            }
-          }
-        }
-      },
-      "panel-11": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
                 {
                   "kind": "PanelQuery",
                   "spec": {
@@ -1315,57 +1189,97 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "inference_benchmark_p95_ttft_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "P95 TTFT",
-                        "range": false,
+                        "format": "table",
                         "instant": true,
-                        "format": "table"
+                        "legendFormat": "P95 TTFT",
+                        "range": false
                       },
                       "version": "v0"
                     },
-                    "refId": "A"
+                    "refId": "B"
                   }
                 }
               ],
               "queryOptions": {},
               "transformations": [
                 {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "number"
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "concurrency",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
+                  "kind": "Transformation",
+                  "group": "joinByField",
+                  "spec": {
+                    "options": {
+                      "byField": "concurrency",
+                      "mode": "outerTabular"
                     }
                   }
                 },
                 {
-                  "id": "organize",
-                  "options": {
-                    "renameByName": {
-                      "Value": "P95 TTFT"
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time 1": true,
+                        "Time 2": true,
+                        "__name__ 1": true,
+                        "__name__ 2": true,
+                        "container 1": true,
+                        "container 2": true,
+                        "endpoint 1": true,
+                        "endpoint 2": true,
+                        "job 1": true,
+                        "job 2": true,
+                        "namespace 1": true,
+                        "namespace 2": true,
+                        "pod 1": true,
+                        "pod 2": true,
+                        "run_id 1": true,
+                        "run_id 2": true,
+                        "service 1": true,
+                        "service 2": true
+                      },
+                      "includeByName": {},
+                      "indexByName": {
+                        "Time 1": 3,
+                        "Time 2": 12,
+                        "Value #A": 1,
+                        "Value #B": 2,
+                        "__name__ 1": 4,
+                        "__name__ 2": 13,
+                        "concurrency": 0,
+                        "container 1": 5,
+                        "container 2": 14,
+                        "endpoint 1": 6,
+                        "endpoint 2": 15,
+                        "job 1": 7,
+                        "job 2": 16,
+                        "namespace 1": 8,
+                        "namespace 2": 17,
+                        "pod 1": 9,
+                        "pod 2": 18,
+                        "run_id 1": 10,
+                        "run_id 2": 19,
+                        "service 1": 11,
+                        "service 2": 20
+                      },
+                      "renameByName": {
+                        "Value #A": "Mean TTFT (ms)",
+                        "Value #B": "P95 TTFT (ms)"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "convertFieldType",
+                  "spec": {
+                    "options": {
+                      "conversions": [
+                        {
+                          "destinationType": "number",
+                          "targetField": "concurrency"
+                        }
+                      ],
+                      "fields": {}
                     }
                   }
                 }
@@ -1373,9 +1287,9 @@
             }
           },
           "description": "One value per concurrency level for the selected benchmark run. X-axis is numeric concurrent requests.",
-          "id": 11,
+          "id": 10,
           "links": [],
-          "title": "P95 TTFT vs concurrency",
+          "title": "Mean & P95 TTFT vs. Concurrency",
           "vizConfig": {
             "group": "trend",
             "kind": "VizConfig",
@@ -1464,142 +1378,16 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "Mean TPOT",
-                        "range": false,
+                        "format": "table",
                         "instant": true,
-                        "format": "table"
+                        "legendFormat": "Mean TPOT",
+                        "range": false
                       },
                       "version": "v0"
                     },
                     "refId": "A"
                   }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "number"
-                      }
-                    ]
-                  }
                 },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "concurrency",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "id": "organize",
-                  "options": {
-                    "renameByName": {
-                      "Value": "Mean TPOT"
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "One value per concurrency level for the selected benchmark run. X-axis is numeric concurrent requests.",
-          "id": 12,
-          "links": [],
-          "title": "Mean TPOT vs concurrency",
-          "vizConfig": {
-            "group": "trend",
-            "kind": "VizConfig",
-            "version": "13.3.0",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "unit": "ms",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  "custom": {
-                    "drawStyle": "line",
-                    "lineWidth": 2,
-                    "showPoints": "always",
-                    "pointSize": 5,
-                    "fillOpacity": 0
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "concurrency"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "none"
-                      },
-                      {
-                        "id": "min",
-                        "value": 0
-                      },
-                      {
-                        "id": "max",
-                        "value": 50
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "xField": "concurrency",
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              }
-            }
-          }
-        }
-      },
-      "panel-13": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
                 {
                   "kind": "PanelQuery",
                   "spec": {
@@ -1613,67 +1401,107 @@
                       "spec": {
                         "editorMode": "code",
                         "expr": "inference_benchmark_p95_tpot_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "P95 TPOT",
-                        "range": false,
+                        "format": "table",
                         "instant": true,
-                        "format": "table"
+                        "legendFormat": "P95 TPOT",
+                        "range": false
                       },
                       "version": "v0"
                     },
-                    "refId": "A"
+                    "refId": "B"
                   }
                 }
               ],
               "queryOptions": {},
               "transformations": [
                 {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "number"
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "concurrency",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
+                  "kind": "Transformation",
+                  "group": "joinByField",
+                  "spec": {
+                    "options": {
+                      "byField": "concurrency",
+                      "mode": "outerTabular"
                     }
                   }
                 },
                 {
-                  "id": "organize",
-                  "options": {
-                    "renameByName": {
-                      "Value": "P95 TPOT"
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time 1": true,
+                        "Time 2": true,
+                        "__name__ 1": true,
+                        "__name__ 2": true,
+                        "container 1": true,
+                        "container 2": true,
+                        "endpoint 1": true,
+                        "endpoint 2": true,
+                        "job 1": true,
+                        "job 2": true,
+                        "namespace 1": true,
+                        "namespace 2": true,
+                        "pod 1": true,
+                        "pod 2": true,
+                        "run_id 1": true,
+                        "run_id 2": true,
+                        "service 1": true,
+                        "service 2": true
+                      },
+                      "includeByName": {},
+                      "indexByName": {
+                        "Time 1": 3,
+                        "Time 2": 12,
+                        "Value #A": 1,
+                        "Value #B": 2,
+                        "__name__ 1": 4,
+                        "__name__ 2": 13,
+                        "concurrency": 0,
+                        "container 1": 5,
+                        "container 2": 14,
+                        "endpoint 1": 6,
+                        "endpoint 2": 15,
+                        "job 1": 7,
+                        "job 2": 16,
+                        "namespace 1": 8,
+                        "namespace 2": 17,
+                        "pod 1": 9,
+                        "pod 2": 18,
+                        "run_id 1": 10,
+                        "run_id 2": 19,
+                        "service 1": 11,
+                        "service 2": 20
+                      },
+                      "renameByName": {
+                        "Value #A": "Mean TPOT (ms)",
+                        "Value #B": "P95 TPOT (ms)"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "Transformation",
+                  "group": "convertFieldType",
+                  "spec": {
+                    "options": {
+                      "conversions": [
+                        {
+                          "destinationType": "number",
+                          "targetField": "concurrency"
+                        }
+                      ],
+                      "fields": {}
                     }
                   }
                 }
               ]
             }
           },
-          "description": "One value per concurrency level for the selected benchmark run. X-axis is numeric concurrent requests.",
-          "id": 13,
+          "description": "Mean and P95 time per output token by numeric concurrency level for the selected benchmark run.",
+          "id": 12,
           "links": [],
-          "title": "P95 TPOT vs concurrency",
+          "title": "Mean & P95 TPOT vs. Concurrency",
           "vizConfig": {
             "group": "trend",
             "kind": "VizConfig",
@@ -2291,25 +2119,7 @@
             "spec": {
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-11"
-              }
-            }
-          },
-          {
-            "kind": "AutoGridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
                 "name": "panel-12"
-              }
-            }
-          },
-          {
-            "kind": "AutoGridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-13"
               }
             }
           }
