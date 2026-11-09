@@ -249,13 +249,16 @@ The repository includes:
 
 **Reproducibility status:** The monitoring configuration reflects the setup used during the benchmark, but a **clean end-to-end rebuild from the committed files has not been verified**. The normal Start Platform workflow deploys the cluster, vLLM and gateway; it does **not currently install the monitoring stack automatically**. The original dashboard JSON preserves panel definitions and queries, not historical Prometheus samples.
 
-## Further work
+## Further work — scaling and reliability
 
-- Verify the committed monitoring manifests against a fresh deployment, including Prometheus scrape targets and Grafana dashboard restoration.
-- Add streaming measurements (TTFT, time per output token, p50/p95) and controlled saturation tests with varied prompts and repeated trials.
-- Consider monitoring deployment automation, reliability tests and request authentication before any broader use.
+The current benchmark evaluates **one NVIDIA L4 GPU** with concurrency levels 1–32. Output throughput continued to increase at concurrency 32, but mean TPOT and P95 TTFT rose substantially; the system's saturation point and production-ready capacity have **not** been established.
 
-The first-pass monitoring and KV-cache observation work is **complete**, with supporting measurements in [the final benchmark report](benchmarks/exploratory-results.md). Capacity limits have not yet been established.
+- **Find the single-GPU saturation point:** Extend the concurrency sweep beyond 32, repeat each level, include a controlled warm-up, and use mixed prompt/output lengths. Compare throughput against P95 TTFT, TPOT, GPU utilization, and KV-cache occupancy.
+- **Scale inference capacity:** Evaluate multiple vLLM replicas and GPU nodes with request routing/load balancing and autoscaling. This is **future work**, not part of the completed single-GPU experiment; it requires additional GPU quota and incurs additional cost.
+- **Automate monitoring and validation:** Restore Prometheus, Grafana, and DCGM Exporter on a clean deployment; verify scrape targets and dashboard panels as part of the deployment workflow.
+- **Evaluate production-readiness:** Test load spikes, failures and recovery, request authentication, and latency-based scaling policies before broader use.
+
+The completed [benchmark results](benchmarks/final-benchmark/results/) and [Grafana snapshot](https://snapshots.raintank.io/dashboard/snapshot/2byWLRtxB1OAgjZseZNeXhtIgRnvNNFh) provide a baseline for future scaling comparisons.
 
 ## Shut down to control costs
 
