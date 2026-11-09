@@ -27,6 +27,10 @@ tolerations:
 extraEnv:
   - name: LD_LIBRARY_PATH
     value: /usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/lib
+  # The chart creates exporter-metrics-volume, but does not mount it
+  # in the exporter pod. Point the collector to the mounted CSV.
+  - name: DCGM_EXPORTER_COLLECTORS
+    value: /etc/dcgm-exporter/custom-metrics/default-counters.csv
 
 # GKE COS driver path: expose NVIDIA libraries to the exporter, read-only.
 # Confirm this host path is populated on the GPU node if exporter still fails.
@@ -37,6 +41,12 @@ extraHostVolumes:
 extraVolumeMounts:
   - name: nvidia-driver-host
     mountPath: /usr/local/nvidia
+    readOnly: true
+  # Use a separate directory to avoid overwriting the image's default CSV.
+  # The chart's default values create exporter-metrics-volume from
+  # exporter-metrics-config-map, whose key is mounted as default-counters.csv.
+  - name: exporter-metrics-volume
+    mountPath: /etc/dcgm-exporter/custom-metrics
     readOnly: true
 
 service:
