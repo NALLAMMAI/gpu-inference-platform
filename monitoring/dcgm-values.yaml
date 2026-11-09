@@ -3,6 +3,16 @@
 # GKE rejects system-node-critical priority for ordinary workloads.
 priorityClassName: ""
 
+# Verified on the L4 GKE node: required for NVML initialization.
+# Privileged mode grants broad host access; keep limited to this exporter.
+securityContext:
+  privileged: true
+  allowPrivilegeEscalation: true
+
+# Explicitly use the non-DRA path supported by the pinned chart.
+kubernetesDRA:
+  enabled: false
+
 nodeSelector:
   cloud.google.com/gke-nodepool: gpu-l4-pool
 
