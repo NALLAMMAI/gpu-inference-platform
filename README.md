@@ -8,6 +8,18 @@ The platform serves **`Qwen/Qwen3-0.6B`** using **vLLM** on one **NVIDIA L4 GPU*
 
 ## Architecture
 
+![GKE node pools and monitoring architecture](docs/gke-node-pools-architecture.svg)
+
+The diagram shows the current **single-GPU benchmark layout**: the FastAPI gateway and monitoring stack run in the CPU node pool, while vLLM and the temporary `vllm bench serve` client run inside the **same `learning-vllm` pod** on the L4 GPU node. The client primarily generates HTTP traffic using CPU, while the model server uses the NVIDIA L4 for inference. The cluster namespaces (`default` and `monitoring`) are logical groupings; node-pool selection and scheduling determine where workloads execute.
+
+### Why does most monitoring run on the CPU node pool?
+
+Prometheus scrapes, stores, and queries metrics; Grafana displays dashboards; Pushgateway receives benchmark results; and Prometheus Operator manages monitoring resources. **None needs GPU compute.** Scheduling these components on `cpu-pool` saves the GPU node's CPU and RAM capacity for vLLM scheduling, tokenization, request handling, and inference. It also reduces monitoring-induced interference in performance measurements. The CPU node also hosts the FastAPI gateway, so it isn't dedicated to monitoring alone. Monitoring could technically be scheduled on the GPU node if scheduling constraints and capacity allowed, but it would compete for the same host resources.
+
+### Why does NVIDIA DCGM Exporter run on the GPU node?
+
+**DCGM Exporter needs local access to NVIDIA GPU/driver telemetry** to expose hardware metrics such as GPU utilization, VRAM usage, power consumption, and temperature. It therefore runs in the `monitoring` namespace **on the L4 GPU node**. Prometheus on the CPU node can scrape its HTTP metrics endpoint over the Kubernetes network; Grafana queries Prometheus. DCGM Exporter does not need to run on the CPU node alongside Prometheus, and Prometheus does not need direct physical GPU access.
+
 ```text
 Client (Cloud Shell / local laptop)
                |
@@ -41,7 +53,7 @@ Client (Cloud Shell / local laptop)
 | --- | --- |
 | Cloud | Google Cloud / GKE Standard, `us-central1-a` |
 | Cluster | `gpu-inference-learning` |
-| CPU node pool | `cpu-pool`: 1 × `e2-standard-2` (2 vCPUs, 8 GB RAM, 50 GB boot disk) |
+| CPU node pool | `cpu-pool`: 1 × `e2-standard-2` (2 vCPUs, 8 GB RAM, 100 GB boot disk) |
 | GPU node pool | `gpu-l4-pool`: 0 or 1 × `g2-standard-4` (4 vCPUs, 16 GB RAM, 100 GB boot disk) |
 | GPU | 1 × NVIDIA L4, 24 GB VRAM when GPU pool is scaled to 1 |
 | Model/server | `Qwen/Qwen3-0.6B` via vLLM |
