@@ -253,7 +253,7 @@ The repository includes:
 
 The current benchmark evaluates **one NVIDIA L4 GPU** with concurrency levels 1–32. Output throughput continued to increase at concurrency 32, but mean TPOT and P95 TTFT rose substantially; the system's saturation point and production-ready capacity have **not** been established.
 
-- **Find the single-GPU saturation point:** Extend the concurrency sweep beyond 32, repeat each level, include a controlled warm-up, and use mixed prompt/output lengths. Compare throughput against P95 TTFT, TPOT, GPU utilization, and KV-cache occupancy.
+- **Find the single-GPU saturation point:** Extend the concurrency sweep beyond 32, repeat each level with a controlled warm-up, and evaluate variable input/output token lengths rather than only the fixed 512-input/256-output synthetic workload. Compare throughput against P95 TTFT, TPOT, GPU utilization, and KV-cache occupancy.
 - **Scale inference capacity:** Evaluate multiple vLLM replicas and GPU nodes with request routing/load balancing and autoscaling. This is **future work**, not part of the completed single-GPU experiment; it requires additional GPU quota and incurs additional cost.
 - **Automate monitoring and validation:** Restore Prometheus, Grafana, and DCGM Exporter on a clean deployment; verify scrape targets and dashboard panels as part of the deployment workflow.
 - **Evaluate production-readiness:** Test load spikes, failures and recovery, request authentication, and latency-based scaling policies before broader use.
