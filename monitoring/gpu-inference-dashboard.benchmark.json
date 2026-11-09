@@ -2029,47 +2029,71 @@
               "queryOptions": {},
               "transformations": [
                 {
-                  "id": "joinByField",
-                  "options": {
-                    "byField": "concurrency",
-                    "mode": "outerTabular"
-                  }
-                },
-                {
-                  "id": "organize",
-                  "options": {
-                    "excludeByName": {
-                      "Time": true,
-                      "Time 1": true,
-                      "Time 2": true,
-                      "run_id": true,
-                      "job": true,
-                      "instance": true,
-                      "concurrency": true
-                    },
-                    "renameByName": {
-                      "Value #A": "Mean TPOT (ms)",
-                      "Value #B": "Output throughput (tokens/s)"
-                    },
-                    "indexByName": {
-                      "Value #A": 0,
-                      "Value #B": 1
+                  "kind": "Transformation",
+                  "group": "joinByField",
+                  "spec": {
+                    "options": {
+                      "byField": "concurrency",
+                      "mode": "outerTabular"
                     }
                   }
                 },
                 {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "Mean TPOT (ms)",
-                        "destinationType": "number"
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "options": {
+                      "excludeByName": {
+                        "Time 1": true,
+                        "Time 2": true,
+                        "__name__ 1": true,
+                        "__name__ 2": true,
+                        "container 1": true,
+                        "container 2": true,
+                        "endpoint 1": true,
+                        "endpoint 2": true,
+                        "job 1": true,
+                        "job 2": true,
+                        "namespace 1": true,
+                        "namespace 2": true,
+                        "pod 1": true,
+                        "pod 2": true,
+                        "run_id 1": true,
+                        "run_id 2": true,
+                        "service 1": true,
+                        "service 2": true
                       },
-                      {
-                        "targetField": "Output throughput (tokens/s)",
-                        "destinationType": "number"
+                      "includeByName": {},
+                      "indexByName": {
+                        "Time 1": 4,
+                        "Time 2": 12,
+                        "Value #A": 1,
+                        "Value #B": 2,
+                        "__name__ 1": 3,
+                        "__name__ 2": 13,
+                        "concurrency": 0,
+                        "container 1": 5,
+                        "container 2": 14,
+                        "endpoint 1": 6,
+                        "endpoint 2": 15,
+                        "job 1": 7,
+                        "job 2": 16,
+                        "namespace 1": 8,
+                        "namespace 2": 17,
+                        "pod 1": 9,
+                        "pod 2": 18,
+                        "run_id 1": 10,
+                        "run_id 2": 19,
+                        "service 1": 11,
+                        "service 2": 20
+                      },
+                      "orderByMode": "manual",
+                      "renameByName": {
+                        "Value #A": "Mean TPOT (ms)",
+                        "Value #B": "Output throughput (tokens/s)",
+                        "__name__ 1": ""
                       }
-                    ]
+                    }
                   }
                 }
               ]
