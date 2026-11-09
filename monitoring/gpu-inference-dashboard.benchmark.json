@@ -1943,8 +1943,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}",
-                        "legendFormat": "Concurrency {{concurrency}}",
+                        "expr": "1000 * sum(rate(vllm:inter_token_latency_seconds_sum{job=\"learning-vllm\"}[5m])) / sum(rate(vllm:inter_token_latency_seconds_count{job=\"learning-vllm\"}[5m]))",
+                        "legendFormat": "5-min rolling mean ITL (TPOT proxy)",
                         "range": true
                       },
                       "version": "v0"
@@ -1957,10 +1957,10 @@
               "transformations": []
             }
           },
-          "description": "Each colored line is the Mean TPOT of a completed concurrency test, recorded when the benchmark publisher sent results to Pushgateway. Lines are held gauge values, not continuously measured per-request TPOT. Select a dashboard time range covering the benchmark run.",
+          "description": "Continuous rolling mean inter-token latency from vLLM's histogram, shown as an approximation of TPOT, not the benchmark's exact per-request TPOT. Five-minute rate window smooths noise but delays changes and can blend adjacent concurrency tests. Gaps appear when no tokens arrive.",
           "id": 16,
           "links": [],
-          "title": "Mean TPOT vs Time (benchmark results)",
+          "title": "Smoothed TPOT proxy (ITL) vs Time",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",
@@ -1993,7 +1993,7 @@
                     "scaleDistribution": {
                       "type": "linear"
                     },
-                    "showPoints": "auto",
+                    "showPoints": "never",
                     "showValues": false,
                     "spanNulls": false,
                     "stacking": {
