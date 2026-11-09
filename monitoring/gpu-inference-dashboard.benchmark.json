@@ -889,8 +889,7 @@
                         "targetField": "concurrency",
                         "destinationType": "number"
                       }
-                    ],
-                    "fields": {}
+                    ]
                   }
                 },
                 {
@@ -905,18 +904,6 @@
                   }
                 },
                 {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "string"
-                      }
-                    ],
-                    "fields": {}
-                  }
-                },
-                {
                   "id": "filterFieldsByName",
                   "options": {
                     "include": {
@@ -924,6 +911,14 @@
                         "concurrency",
                         "Value"
                       ]
+                    }
+                  }
+                },
+                {
+                  "id": "organize",
+                  "options": {
+                    "renameByName": {
+                      "Value": "Output tokens/sec"
                     }
                   }
                 }
@@ -935,7 +930,7 @@
           "links": [],
           "title": "Output throughput (tokens/s)",
           "vizConfig": {
-            "group": "barchart",
+            "group": "trend",
             "kind": "VizConfig",
             "version": "13.3.0",
             "spec": {
@@ -944,7 +939,6 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "min": 0,
                   "unit": "short",
                   "thresholds": {
                     "mode": "absolute",
@@ -954,28 +948,40 @@
                         "value": 0
                       }
                     ]
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 2,
+                    "showPoints": "always",
+                    "pointSize": 5,
+                    "fillOpacity": 0
                   }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "concurrency"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "none"
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "xField": "concurrency",
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "barRadius": 0,
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0,
                 "legend": {
+                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": false,
-                  "calcs": []
+                  "showLegend": false
                 },
                 "tooltip": {
-                  "mode": "single",
+                  "mode": "multi",
                   "sort": "none"
                 }
               }
@@ -1024,8 +1030,7 @@
                         "targetField": "concurrency",
                         "destinationType": "number"
                       }
-                    ],
-                    "fields": {}
+                    ]
                   }
                 },
                 {
@@ -1040,18 +1045,6 @@
                   }
                 },
                 {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "string"
-                      }
-                    ],
-                    "fields": {}
-                  }
-                },
-                {
                   "id": "filterFieldsByName",
                   "options": {
                     "include": {
@@ -1059,6 +1052,14 @@
                         "concurrency",
                         "Value"
                       ]
+                    }
+                  }
+                },
+                {
+                  "id": "organize",
+                  "options": {
+                    "renameByName": {
+                      "Value": "Requests/sec"
                     }
                   }
                 }
@@ -1070,7 +1071,7 @@
           "links": [],
           "title": "Request throughput (requests/s)",
           "vizConfig": {
-            "group": "barchart",
+            "group": "trend",
             "kind": "VizConfig",
             "version": "13.3.0",
             "spec": {
@@ -1079,7 +1080,6 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "min": 0,
                   "unit": "short",
                   "thresholds": {
                     "mode": "absolute",
@@ -1089,28 +1089,40 @@
                         "value": 0
                       }
                     ]
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 2,
+                    "showPoints": "always",
+                    "pointSize": 5,
+                    "fillOpacity": 0
                   }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "concurrency"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "none"
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "xField": "concurrency",
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "barRadius": 0,
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0,
                 "legend": {
+                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": false,
-                  "calcs": []
+                  "showLegend": false
                 },
                 "tooltip": {
-                  "mode": "single",
+                  "mode": "multi",
                   "sort": "none"
                 }
               }
@@ -1147,132 +1159,7 @@
                     },
                     "refId": "A"
                   }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "number"
-                      }
-                    ],
-                    "fields": {}
-                  }
                 },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "concurrency",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "string"
-                      }
-                    ],
-                    "fields": {}
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "Completed benchmark measurements indexed by concurrency (1, 2, 4, 8, 16, 32); independent of publication time. Run selection uses the Benchmark run ID control.",
-          "id": 10,
-          "links": [],
-          "title": "Mean TTFT (ms)",
-          "vizConfig": {
-            "group": "barchart",
-            "kind": "VizConfig",
-            "version": "13.3.0",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "min": 0,
-                  "unit": "ms",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "concurrency"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "none"
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "xField": "concurrency",
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "barRadius": 0,
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0,
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false,
-                  "calcs": []
-                },
-                "tooltip": {
-                  "mode": "single",
-                  "sort": "none"
-                }
-              }
-            }
-          }
-        }
-      },
-      "panel-11": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
                 {
                   "kind": "PanelQuery",
                   "spec": {
@@ -1293,12 +1180,19 @@
                       },
                       "version": "v0"
                     },
-                    "refId": "A"
+                    "refId": "B"
                   }
                 }
               ],
               "queryOptions": {},
               "transformations": [
+                {
+                  "id": "joinByField",
+                  "options": {
+                    "byField": "concurrency",
+                    "mode": "outerTabular"
+                  }
+                },
                 {
                   "id": "convertFieldType",
                   "options": {
@@ -1307,8 +1201,7 @@
                         "targetField": "concurrency",
                         "destinationType": "number"
                       }
-                    ],
-                    "fields": {}
+                    ]
                   }
                 },
                 {
@@ -1323,25 +1216,21 @@
                   }
                 },
                 {
-                  "id": "convertFieldType",
+                  "id": "organize",
                   "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "string"
-                      }
-                    ],
-                    "fields": {}
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
+                    "excludeByName": {
+                      "Time": true,
+                      "run_id": true,
+                      "job": true,
+                      "instance": true
+                    },
+                    "renameByName": {
+                      "Value #A": "Mean TTFT",
+                      "Value #B": "P95 TTFT",
+                      "Value": "Mean TTFT"
+                    },
+                    "indexByName": {
+                      "concurrency": 0
                     }
                   }
                 }
@@ -1349,11 +1238,11 @@
             }
           },
           "description": "Completed benchmark measurements indexed by concurrency (1, 2, 4, 8, 16, 32); independent of publication time. Run selection uses the Benchmark run ID control.",
-          "id": 11,
+          "id": 10,
           "links": [],
-          "title": "P95 TTFT (ms)",
+          "title": "TTFT vs concurrency — Mean and P95",
           "vizConfig": {
-            "group": "barchart",
+            "group": "trend",
             "kind": "VizConfig",
             "version": "13.3.0",
             "spec": {
@@ -1362,7 +1251,6 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "min": 0,
                   "unit": "ms",
                   "thresholds": {
                     "mode": "absolute",
@@ -1372,6 +1260,13 @@
                         "value": 0
                       }
                     ]
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 2,
+                    "showPoints": "always",
+                    "pointSize": 5,
+                    "fillOpacity": 0
                   }
                 },
                 "overrides": [
@@ -1391,22 +1286,14 @@
               },
               "options": {
                 "xField": "concurrency",
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "barRadius": 0,
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0,
                 "legend": {
+                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": false,
-                  "calcs": []
+                  "showLegend": true
                 },
                 "tooltip": {
-                  "mode": "single",
+                  "mode": "multi",
                   "sort": "none"
                 }
               }
@@ -1414,7 +1301,7 @@
           }
         }
       },
-      "panel-12": {
+      "panel-11": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1443,132 +1330,7 @@
                     },
                     "refId": "A"
                   }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "number"
-                      }
-                    ],
-                    "fields": {}
-                  }
                 },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "concurrency",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "convertFieldType",
-                  "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "string"
-                      }
-                    ],
-                    "fields": {}
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "Completed benchmark measurements indexed by concurrency (1, 2, 4, 8, 16, 32); independent of publication time. Run selection uses the Benchmark run ID control.",
-          "id": 12,
-          "links": [],
-          "title": "Mean TPOT (ms)",
-          "vizConfig": {
-            "group": "barchart",
-            "kind": "VizConfig",
-            "version": "13.3.0",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "min": 0,
-                  "unit": "ms",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      }
-                    ]
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "concurrency"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "none"
-                      }
-                    ]
-                  }
-                ]
-              },
-              "options": {
-                "xField": "concurrency",
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "barRadius": 0,
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0,
-                "legend": {
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false,
-                  "calcs": []
-                },
-                "tooltip": {
-                  "mode": "single",
-                  "sort": "none"
-                }
-              }
-            }
-          }
-        }
-      },
-      "panel-13": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
                 {
                   "kind": "PanelQuery",
                   "spec": {
@@ -1589,12 +1351,19 @@
                       },
                       "version": "v0"
                     },
-                    "refId": "A"
+                    "refId": "B"
                   }
                 }
               ],
               "queryOptions": {},
               "transformations": [
+                {
+                  "id": "joinByField",
+                  "options": {
+                    "byField": "concurrency",
+                    "mode": "outerTabular"
+                  }
+                },
                 {
                   "id": "convertFieldType",
                   "options": {
@@ -1603,8 +1372,7 @@
                         "targetField": "concurrency",
                         "destinationType": "number"
                       }
-                    ],
-                    "fields": {}
+                    ]
                   }
                 },
                 {
@@ -1619,25 +1387,21 @@
                   }
                 },
                 {
-                  "id": "convertFieldType",
+                  "id": "organize",
                   "options": {
-                    "conversions": [
-                      {
-                        "targetField": "concurrency",
-                        "destinationType": "string"
-                      }
-                    ],
-                    "fields": {}
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "Value"
-                      ]
+                    "excludeByName": {
+                      "Time": true,
+                      "run_id": true,
+                      "job": true,
+                      "instance": true
+                    },
+                    "renameByName": {
+                      "Value #A": "Mean TPOT",
+                      "Value #B": "P95 TPOT",
+                      "Value": "Mean TPOT"
+                    },
+                    "indexByName": {
+                      "concurrency": 0
                     }
                   }
                 }
@@ -1645,11 +1409,11 @@
             }
           },
           "description": "Completed benchmark measurements indexed by concurrency (1, 2, 4, 8, 16, 32); independent of publication time. Run selection uses the Benchmark run ID control.",
-          "id": 13,
+          "id": 11,
           "links": [],
-          "title": "P95 TPOT (ms)",
+          "title": "TPOT vs concurrency — Mean and P95",
           "vizConfig": {
-            "group": "barchart",
+            "group": "trend",
             "kind": "VizConfig",
             "version": "13.3.0",
             "spec": {
@@ -1658,7 +1422,6 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "min": 0,
                   "unit": "ms",
                   "thresholds": {
                     "mode": "absolute",
@@ -1668,6 +1431,13 @@
                         "value": 0
                       }
                     ]
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 2,
+                    "showPoints": "always",
+                    "pointSize": 5,
+                    "fillOpacity": 0
                   }
                 },
                 "overrides": [
@@ -1687,22 +1457,14 @@
               },
               "options": {
                 "xField": "concurrency",
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "barWidth": 0.8,
-                "groupWidth": 0.7,
-                "barRadius": 0,
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0,
                 "legend": {
+                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": false,
-                  "calcs": []
+                  "showLegend": true
                 },
                 "tooltip": {
-                  "mode": "single",
+                  "mode": "multi",
                   "sort": "none"
                 }
               }
@@ -1710,7 +1472,7 @@
           }
         }
       },
-      "panel-14": {
+      "panel-12": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1744,7 +1506,7 @@
             }
           },
           "description": "Rolling average time to first token from live vLLM server histograms, over a 2-minute window. This is server-side monitoring, not the benchmark client summary.",
-          "id": 14,
+          "id": 12,
           "links": [],
           "title": "Live TTFT over time (mean)",
           "vizConfig": {
@@ -1825,7 +1587,7 @@
           }
         }
       },
-      "panel-15": {
+      "panel-13": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1859,7 +1621,7 @@
             }
           },
           "description": "Rolling average inter-token interval from live vLLM server histogram (2-minute window). A proxy for TPOT, not identical to the client-side per-request benchmark TPOT.",
-          "id": 15,
+          "id": 13,
           "links": [],
           "title": "Live inter-token latency over time (TPOT proxy)",
           "vizConfig": {
@@ -2062,24 +1824,6 @@
                 "name": "panel-13"
               }
             }
-          },
-          {
-            "kind": "AutoGridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-14"
-              }
-            }
-          },
-          {
-            "kind": "AutoGridLayoutItem",
-            "spec": {
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-15"
-              }
-            }
           }
         ],
         "maxColumnCount": 3,
@@ -2126,7 +1870,7 @@
       "timezone": "browser",
       "to": "now"
     },
-    "title": "GPU Inference - Live Monitoring and Concurrency Benchmarks",
+    "title": "GPU Inference - Live Monitoring and Benchmark Trends",
     "variables": [
       {
         "kind": "TextVariable",
