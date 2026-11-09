@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-label="GKE CPU and GPU node pools showing namespaces, workloads, and monitoring connections">
+<style>
+text{font-family:Arial,Helvetica,sans-serif;fill:#1f2937}.heading{font-size:25px;font-weight:bold}.title{font-size:19px;font-weight:bold}.sub{font-size:14px}.tiny{font-size:13px}.box{fill:#fff;stroke:#9ca3af;stroke-width:1.3}.ns{fill:#fff;fill-opacity:.65;stroke:#c4c9d3;stroke-width:1.2}.arrow{stroke:#64748b;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+</style><defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9" fill="#64748b"/></marker></defs>
+<rect width="1200" height="760" fill="#f8fafc"/><rect x="14" y="13" width="1172" height="733" rx="17" fill="#fff" stroke="#94a3b8" stroke-width="2"/>
+<text x="600" y="49" text-anchor="middle" class="heading">GKE: gpu-inference-learning (us-central1-a)</text>
+<rect x="34" y="73" width="553" height="620" rx="17" fill="#e8f2ff" stroke="#60a5fa" stroke-width="2"/>
+<rect x="613" y="73" width="553" height="620" rx="17" fill="#ebf9ed" stroke="#4ade80" stroke-width="2"/>
+<text x="56" y="111" class="title">CPU node pool: cpu-pool</text><text x="635" y="111" class="title">GPU node pool: gpu-l4-pool</text>
+<text x="56" y="137" class="sub">e2-standard-2 | 2 vCPU | 8 GB RAM | 100 GB disk</text>
+<text x="635" y="137" class="sub">g2-standard-4 | 4 vCPU | 16 GB RAM | 100 GB disk</text><text x="635" y="158" class="sub">1 × NVIDIA L4 | 24 GB VRAM</text>
+<rect class="ns" x="51" y="174" width="518" height="105" rx="12"/><rect class="ns" x="630" y="174" width="518" height="144" rx="12"/>
+<text x="67" y="199" class="title">default namespace</text><text x="646" y="199" class="title">default namespace</text>
+<rect class="box" x="68" y="214" width="480" height="48" rx="9"/><text x="85" y="234" class="sub" font-weight="bold">learning-gateway-gateway</text><text x="85" y="250" class="tiny">FastAPI HTTP gateway</text>
+<rect class="box" x="648" y="213" width="482" height="91" rx="9"/><text x="665" y="237" class="sub" font-weight="bold">learning-vllm</text><text x="665" y="255" class="tiny">vLLM server | Qwen3-0.6B | port 8000</text><text x="665" y="275" class="tiny">vllm bench serve: CPU-heavy client in same pod</text><text x="665" y="292" class="tiny">Shares pod CPU/RAM with inference server</text>
+<path class="arrow" d="M548 239 H648"/><rect x="552" y="219" width="91" height="17" fill="#fff"/><text x="598" y="231" text-anchor="middle" font-size="11">HTTP</text>
+<rect class="ns" x="51" y="332" width="518" height="327" rx="12"/><rect class="ns" x="630" y="332" width="518" height="327" rx="12"/>
+<text x="67" y="356" class="title">monitoring namespace</text><text x="646" y="356" class="title">monitoring namespace</text>
+<rect class="box" x="70" y="378" width="475" height="49" rx="9"/><text x="86" y="398" class="sub" font-weight="bold">Grafana</text><text x="86" y="416" class="tiny">13-panel live + benchmark dashboard</text>
+<rect class="box" x="70" y="449" width="475" height="49" rx="9"/><text x="86" y="469" class="sub" font-weight="bold">Prometheus</text><text x="86" y="486" class="tiny">Scrapes and stores metrics</text>
+<path class="arrow" d="M307 449 V427"/><text x="320" y="441" class="tiny">queries</text>
+<rect class="box" x="70" y="524" width="475" height="48" rx="9"/><text x="86" y="544" class="sub" font-weight="bold">Prometheus Operator</text><text x="86" y="560" class="tiny">Manages monitoring configuration</text>
+<rect class="box" x="70" y="594" width="475" height="48" rx="9"/><text x="86" y="615" class="sub" font-weight="bold">Benchmark Pushgateway</text><text x="86" y="631" class="tiny">Stores published concurrency-test metrics</text>
+<rect class="box" x="648" y="445" width="482" height="76" rx="9"/><text x="666" y="473" class="sub" font-weight="bold">NVIDIA DCGM Exporter</text><text x="666" y="491" class="tiny">Reads local L4 utilization, VRAM, temperature, power</text>
+<path class="arrow" d="M648 479 H545"/><text x="581" y="469" text-anchor="middle" font-size="11">GPU metrics</text>
+<path class="arrow" d="M105 594 V498"/><text x="114" y="582" class="tiny">benchmark</text><text x="114" y="597" class="tiny">metrics</text>
+<text x="600" y="722" text-anchor="middle" class="sub">Namespaces are logical groups; node pools determine where pods execute. System pods omitted.</text>
+</svg>
