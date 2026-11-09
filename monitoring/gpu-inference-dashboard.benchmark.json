@@ -1164,15 +1164,9 @@
               "queryOptions": {},
               "transformations": [
                 {
-                  "id": "filterFieldsByName",
+                  "id": "labelsToFields",
                   "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "stat",
-                        "Value"
-                      ]
-                    }
+                    "mode": "columns"
                   }
                 },
                 {
@@ -1209,7 +1203,7 @@
               ]
             }
           },
-          "description": "Single-query instant vector with a stat label and Grafana matrix transform; plots Mean and P95 TTFT against concurrency.",
+          "description": "Plots Mean and P95 using a labelled Prometheus instant vector, labels-to-fields extraction and a concurrency/stat pivot. Labels are distinct lines.",
           "id": 10,
           "links": [],
           "title": "TTFT vs concurrency — Mean and P95",
@@ -1253,16 +1247,46 @@
                         "value": "none"
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Mean TTFT"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "P95 TTFT"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
                   }
                 ]
               },
               "options": {
                 "xField": "concurrency",
                 "legend": {
-                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": true
+                  "showLegend": true,
+                  "calcs": []
                 },
                 "tooltip": {
                   "mode": "multi",
@@ -1307,15 +1331,9 @@
               "queryOptions": {},
               "transformations": [
                 {
-                  "id": "filterFieldsByName",
+                  "id": "labelsToFields",
                   "options": {
-                    "include": {
-                      "names": [
-                        "concurrency",
-                        "stat",
-                        "Value"
-                      ]
-                    }
+                    "mode": "columns"
                   }
                 },
                 {
@@ -1352,7 +1370,7 @@
               ]
             }
           },
-          "description": "Single-query instant vector with a stat label and Grafana matrix transform; plots Mean and P95 TPOT against concurrency.",
+          "description": "Plots Mean and P95 using a labelled Prometheus instant vector, labels-to-fields extraction and a concurrency/stat pivot. Labels are distinct lines.",
           "id": 11,
           "links": [],
           "title": "TPOT vs concurrency — Mean and P95",
@@ -1396,16 +1414,46 @@
                         "value": "none"
                       }
                     ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Mean TPOT"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "P95 TPOT"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "orange"
+                        }
+                      }
+                    ]
                   }
                 ]
               },
               "options": {
                 "xField": "concurrency",
                 "legend": {
-                  "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": true
+                  "showLegend": true,
+                  "calcs": []
                 },
                 "tooltip": {
                   "mode": "multi",
