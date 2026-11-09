@@ -187,6 +187,25 @@ done
 
 Run the staggered test via the gateway port-forward (local 8080) in another terminal. This is a learning-scale observation, not a rigorous traced scheduler benchmark.
 
+## Official vLLM concurrency sweep — November 8, 2026
+
+**[Grafana benchmark dashboard snapshot](https://snapshots.raintank.io/dashboard/snapshot/2byWLRtxB1OAgjZseZNeXhtIgRnvNNFh)** — public, read-only historical dashboard with 14 panels. Dashboard source: [`../monitoring/gpu-inference-dashboard.benchmark.json`](../monitoring/gpu-inference-dashboard.benchmark.json).
+
+The **November 8, 2026** benchmark ran the official `vllm bench serve` client inside the `learning-vllm` pod on the NVIDIA L4 node, targeting `127.0.0.1:8000/v1/chat/completions` (not the FastAPI gateway). It used **128 requests at each of six concurrency levels** (768/768 completed), synthetic requests of **512 input tokens** and **256 output tokens**, with approximately **180 seconds between levels**. Results were published to Pushgateway, collected in Prometheus, and visualized in Grafana. The co-located client may consume GPU-node CPU/RAM, so these figures should not be interpreted as isolated server-only capacity.
+
+| Concurrent requests | Output tokens/s | Requests/s | Mean TTFT (ms) | P95 TTFT (ms) | Mean TPOT (ms) | P95 TPOT (ms) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 132.87 | 0.52 | 60.36 | 69.01 | 7.32 | 7.39 |
+| 2 | 252.97 | 0.99 | 47.36 | 58.02 | 7.74 | 7.84 |
+| 4 | 451.67 | 1.76 | 78.04 | 102.51 | 8.48 | 8.58 |
+| 8 | 760.81 | 2.97 | 109.21 | 185.30 | 9.92 | 10.12 |
+| 16 | 1,179.06 | 4.61 | 166.97 | 368.55 | 12.56 | 12.99 |
+| 32 | 1,611.44 | 6.30 | 244.34 | 740.52 | 18.28 | 18.95 |
+
+**Findings:** Aggregate output throughput increased **12.1×**, from 132.87 to 1,611.44 output tokens/s (concurrency 1 → 32). Meanwhile mean TPOT increased from **7.32 to 18.28 ms** and P95 TTFT from **69.01 to 740.52 ms**. Going from concurrency 16 to 32 increased output throughput by approximately **37%** while mean TPOT rose approximately **46%**, illustrating diminishing throughput gains and a throughput–latency tradeoff. Mean and P95 TPOT remained relatively close, whereas the TTFT tail widened markedly at higher load. This was one run per concurrency level, not a repeated statistical comparison; no saturation ceiling or production-safe concurrency target was established.
+
+**Metric definitions:** TTFT = time to first generated token; TPOT = time per output token after the first; P95 = 95th percentile across measured requests; output tokens/s = aggregate generated output tokens per elapsed second; requests/s = completed requests per elapsed second. Client-reported benchmark metrics differ from rolling Prometheus server-side TTFT/ITL measurements. The GPU telemetry panel values are not included in the table, and zero sampled waiting requests would not rule out brief queues between scrapes.
+
 ## Interpretation and limitations
 
 Throughput increased with concurrency in these initial runs, consistent with overlapping work and possible continuous batching. A separate staggered-arrival experiment observed dynamic request admission via the vLLM running-request gauge, but exact token-level GPU batch composition and static-batching comparative speedup were **not measured**. Since all original prompts were identical, cache reuse may influence results if prefix caching was enabled. No repeated trials, warm-up standardization, token-length matching, GPU utilization measurements, streaming TTFT, p95 latency, or GPU-only timings were collected. The script currently uses non-streaming responses.
