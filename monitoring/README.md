@@ -9,9 +9,9 @@ This directory prepares **NVIDIA DCGM Exporter** for the existing GKE NVIDIA L4 
 | Prometheus | Scrapes and stores both sources | Prefer CPU node |
 | Grafana | Queries Prometheus for time-series dashboards | Prefer CPU node |
 
-## Why this does not consume a second GPU allocation
+## DCGM Exporter shares the existing GPU node without allocating a GPU
 
-The exporter is a DaemonSet restricted with `nodeSelector` to the GKE `gpu-l4-pool`. It tolerates that pool's `nvidia.com/gpu=present:NoSchedule` taint, and deliberately **does not request `nvidia.com/gpu`** as a Kubernetes resource. This lets it monitor the node without taking the GPU resource currently assigned to vLLM. It still uses some CPU and system RAM, and runtime compatibility must be verified.
+The exporter is a DaemonSet restricted with `nodeSelector` to the GKE `gpu-l4-pool`. It tolerates that pool's `nvidia.com/gpu=present:NoSchedule` taint, and deliberately **does not request `nvidia.com/gpu`** as a Kubernetes resource. This lets it monitor the same NVIDIA L4 that vLLM uses without reserving GPU compute capacity as a separate Kubernetes GPU resource. It still uses some CPU and system RAM, and runtime compatibility must be verified.
 
 ## Install after Prometheus Operator is installed
 
