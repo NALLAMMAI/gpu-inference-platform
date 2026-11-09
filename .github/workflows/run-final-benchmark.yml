@@ -62,7 +62,10 @@ jobs:
             -n monitoring -f monitoring/stack-values.yaml --wait --timeout 12m
           kubectl apply -f monitoring/vllm-servicemonitor.yaml
           helm upgrade --install dcgm-exporter gpu-helm-charts/dcgm-exporter \
-            -n monitoring -f monitoring/dcgm-values.yaml --wait --timeout 8m
+            --version 4.8.4 --reset-values \
+            -n monitoring -f monitoring/dcgm-values.yaml \
+            --set-file customMetrics=monitoring/dcgm-basic.csv \
+            --wait --timeout 8m
           helm upgrade --install benchmark-pushgateway prometheus-community/prometheus-pushgateway \
             -n monitoring -f benchmarks/final-benchmark/pushgateway-values.yaml \
             --wait --timeout 6m
