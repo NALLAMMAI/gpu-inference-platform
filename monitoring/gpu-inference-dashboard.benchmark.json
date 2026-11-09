@@ -967,6 +967,14 @@
                       {
                         "id": "unit",
                         "value": "none"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 50
                       }
                     ]
                   }
@@ -1108,6 +1116,14 @@
                       {
                         "id": "unit",
                         "value": "none"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 50
                       }
                     ]
                   }
@@ -1249,6 +1265,14 @@
                       {
                         "id": "unit",
                         "value": "none"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 50
                       }
                     ]
                   }
@@ -1390,6 +1414,14 @@
                       {
                         "id": "unit",
                         "value": "none"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 50
                       }
                     ]
                   }
@@ -1531,6 +1563,14 @@
                       {
                         "id": "unit",
                         "value": "none"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 50
                       }
                     ]
                   }
@@ -1672,6 +1712,14 @@
                       {
                         "id": "unit",
                         "value": "none"
+                      },
+                      {
+                        "id": "min",
+                        "value": 0
+                      },
+                      {
+                        "id": "max",
+                        "value": 50
                       }
                     ]
                   }
@@ -1943,9 +1991,11 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "1000 * sum(rate(vllm:inter_token_latency_seconds_sum{job=\"learning-vllm\"}[5m])) / sum(rate(vllm:inter_token_latency_seconds_count{job=\"learning-vllm\"}[5m]))",
-                        "legendFormat": "5-min rolling mean ITL (TPOT proxy)",
-                        "range": true
+                        "expr": "label_replace(inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}, \"measurement\", \"Mean TPOT (ms)\", \"__name__\", \".*\") or label_replace(inference_benchmark_output_tokens_per_second{run_id=\"$benchmark_run\"}, \"measurement\", \"Output throughput (tok/s)\", \"__name__\", \".*\")",
+                        "legendFormat": "{{measurement}}",
+                        "range": false,
+                        "instant": true,
+                        "format": "table"
                       },
                       "version": "v0"
                     },
@@ -1954,88 +2004,127 @@
                 }
               ],
               "queryOptions": {},
-              "transformations": []
+              "transformations": [
+                {
+                  "id": "labelsToFields",
+                  "options": {
+                    "mode": "columns"
+                  }
+                },
+                {
+                  "id": "groupingToMatrix",
+                  "options": {
+                    "columnField": "measurement",
+                    "rowField": "concurrency",
+                    "valueField": "Value",
+                    "emptyValue": "null"
+                  }
+                },
+                {
+                  "id": "convertFieldType",
+                  "options": {
+                    "conversions": [
+                      {
+                        "targetField": "Mean TPOT (ms)",
+                        "destinationType": "number"
+                      },
+                      {
+                        "targetField": "Output throughput (tok/s)",
+                        "destinationType": "number"
+                      },
+                      {
+                        "targetField": "concurrency",
+                        "destinationType": "number"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "sortBy",
+                  "options": {
+                    "fields": [
+                      {
+                        "field": "Mean TPOT (ms)",
+                        "desc": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "filterFieldsByName",
+                  "options": {
+                    "include": {
+                      "names": [
+                        "Mean TPOT (ms)",
+                        "Output throughput (tok/s)"
+                      ]
+                    }
+                  }
+                }
+              ]
             }
           },
-          "description": "Continuous rolling mean inter-token latency from vLLM's histogram, shown as an approximation of TPOT, not the benchmark's exact per-request TPOT. Five-minute rate window smooths noise but delays changes and can blend adjacent concurrency tests. Gaps appear when no tokens arrive.",
+          "description": "Throughput-latency tradeoff from completed benchmark runs. X=mean time per output token (ms); Y=aggregate output tokens/sec. Each point corresponds to one concurrency level. Prometheus instant query combines both metrics for the selected run; matrix transform pivots into numeric TPOT and throughput fields.",
           "id": 16,
           "links": [],
-          "title": "Smoothed TPOT proxy (ITL) vs Time",
+          "title": "Output throughput vs Mean TPOT",
           "vizConfig": {
-            "group": "timeseries",
+            "group": "trend",
             "kind": "VizConfig",
+            "version": "13.3.0",
             "spec": {
               "fieldConfig": {
                 "defaults": {
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  },
+                  "unit": "short",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "color": "green",
                         "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
                       }
                     ]
                   },
-                  "unit": "ms"
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 2,
+                    "showPoints": "always",
+                    "pointSize": 6,
+                    "fillOpacity": 0
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Mean TPOT (ms)"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "ms"
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
+                "xField": "Mean TPOT (ms)",
                 "legend": {
                   "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": true
+                  "showLegend": false
                 },
                 "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
+                  "mode": "multi",
                   "sort": "none"
                 }
               }
-            },
-            "version": "13.3.0"
+            }
           }
         }
       }
