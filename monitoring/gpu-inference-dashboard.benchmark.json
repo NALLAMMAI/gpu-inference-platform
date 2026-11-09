@@ -1991,8 +1991,8 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "label_replace(inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}, \"measurement\", \"Mean TPOT (ms)\", \"__name__\", \".*\") or label_replace(inference_benchmark_output_tokens_per_second{run_id=\"$benchmark_run\"}, \"measurement\", \"Output throughput (tok/s)\", \"__name__\", \".*\")",
-                        "legendFormat": "{{measurement}}",
+                        "expr": "inference_benchmark_mean_tpot_ms{run_id=\"$benchmark_run\"}",
+                        "legendFormat": "Mean TPOT",
                         "range": false,
                         "instant": true,
                         "format": "table"
@@ -2001,23 +2001,60 @@
                     },
                     "refId": "A"
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "prometheus"
+                      },
+                      "group": "prometheus",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "inference_benchmark_output_tokens_per_second{run_id=\"$benchmark_run\"}",
+                        "legendFormat": "Output throughput",
+                        "range": false,
+                        "instant": true,
+                        "format": "table"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "B"
+                  }
                 }
               ],
               "queryOptions": {},
               "transformations": [
                 {
-                  "id": "labelsToFields",
+                  "id": "joinByField",
                   "options": {
-                    "mode": "columns"
+                    "byField": "concurrency",
+                    "mode": "outerTabular"
                   }
                 },
                 {
-                  "id": "groupingToMatrix",
+                  "id": "organize",
                   "options": {
-                    "columnField": "measurement",
-                    "rowField": "concurrency",
-                    "valueField": "Value",
-                    "emptyValue": "null"
+                    "excludeByName": {
+                      "Time": true,
+                      "Time 1": true,
+                      "Time 2": true,
+                      "run_id": true,
+                      "job": true,
+                      "instance": true,
+                      "concurrency": true
+                    },
+                    "renameByName": {
+                      "Value #A": "Mean TPOT (ms)",
+                      "Value #B": "Output throughput (tokens/s)"
+                    },
+                    "indexByName": {
+                      "Value #A": 0,
+                      "Value #B": 1
+                    }
                   }
                 },
                 {
@@ -2029,42 +2066,16 @@
                         "destinationType": "number"
                       },
                       {
-                        "targetField": "Output throughput (tok/s)",
-                        "destinationType": "number"
-                      },
-                      {
-                        "targetField": "concurrency",
+                        "targetField": "Output throughput (tokens/s)",
                         "destinationType": "number"
                       }
                     ]
-                  }
-                },
-                {
-                  "id": "sortBy",
-                  "options": {
-                    "fields": [
-                      {
-                        "field": "Mean TPOT (ms)",
-                        "desc": false
-                      }
-                    ]
-                  }
-                },
-                {
-                  "id": "filterFieldsByName",
-                  "options": {
-                    "include": {
-                      "names": [
-                        "Mean TPOT (ms)",
-                        "Output throughput (tok/s)"
-                      ]
-                    }
                   }
                 }
               ]
             }
           },
-          "description": "Throughput-latency tradeoff from completed benchmark runs. X=mean time per output token (ms); Y=aggregate output tokens/sec. Each point corresponds to one concurrency level. Prometheus instant query combines both metrics for the selected run; matrix transform pivots into numeric TPOT and throughput fields.",
+          "description": "Completed benchmark tradeoff: X is mean TPOT (ms), Y is output throughput (tokens/s). Two Prometheus instant tables are joined by concurrency and converted to a numeric trend.",
           "id": 16,
           "links": [],
           "title": "Output throughput vs Mean TPOT",
