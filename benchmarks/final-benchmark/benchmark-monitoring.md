@@ -1,7 +1,6 @@
 # Streaming inference benchmarks + Grafana
 
-This extension is **configuration only** until a cluster and vLLM server are running.
-It does not change the original monitoring dashboard or old benchmark measurements.
+This directory contains the configuration, metrics publisher and archived results for the **single-NVIDIA-L4** benchmark. The completed run used the existing GKE `learning-vllm` pod; no additional GPU, external self-hosted runner, or benchmark Kubernetes pod was created.
 
 ## Data flow
 
@@ -34,36 +33,42 @@ The chart creates a ServiceMonitor labeled `release: monitoring`; no additional
 ServiceMonitor manifest is required. The Service is ClusterIP-only. Check the
 actual Service name with `kubectl get svc` before port-forwarding.
 
-## Benchmark run
+## Benchmark run (one GPU, existing serving pod)
 
-From a host with vLLM benchmark CLI installed and a port-forward to vLLM:
+Use [Run Final vLLM Benchmark](../../.github/workflows/run-final-benchmark.yml) in **GitHub Actions** and enter `RUN_BENCHMARK`. The job runs on a standard GitHub-hosted **CPU runner** to authenticate to GKE, install/update monitoring, and orchestrate commands.
+
+The benchmark client is **not running on the GitHub runner** and **not on an external GPU**. Instead, the workflow calls `kubectl exec` to run `vllm bench serve` inside the existing `learning-vllm` pod, alongside the inference server on the **same NVIDIA L4 node**. It sends requests to `http://127.0.0.1:8000/v1/chat/completions` within that pod. The client and server can compete for the pod/node's CPU and RAM; only the server runs model inference on the L4.
+
+The workflow sweeps concurrency **1, 2, 4, 8, 16, 32**, with 128 synthetic requests (target 512 input and 256 output tokens) at each level and 180-second cooldowns. After each level it copies the JSON result to the GitHub-hosted runner, invokes [`publish-metrics.py`](publish-metrics.py) **on that CPU runner**, updates `summary.csv`, and publishes aggregate metrics through a localhost `kubectl port-forward` to the in-cluster Pushgateway. Pushgateway/Prometheus/Grafana run in the monitoring stack (preferably on the CPU node), while DCGM Exporter runs on the GPU node to read local GPU telemetry without allocating another GPU.
+
+The completed JSON and CSV are archived under [`results/`](results/) and uploaded as GitHub Actions artifacts. The optional [`run-concurrency-sweep.sh`](run-concurrency-sweep.sh) provides the same CLI benchmark loop for an already-configured environment, but it is **not used by the current GitHub Actions workflow** and does not provision hardware. Do not install a separate GPU or self-hosted runner for this experiment.
+
+`--max-concurrency` limits client requests in flight, not the internal vLLM GPU batch size. Measurements are synthetic; output lengths may vary. Warm-ups and repeat trials are recommended for more reliable comparisons.
+
+### Metrics publishing without a benchmark rerun
+
+When the monitoring stack is running, forward Pushgateway from a trusted machine with `kubectl` access:
 
 ```bash
-kubectl port-forward svc/learning-vllm 8000:8000
-# In another terminal, from the repo root:
-bash benchmarks/final-benchmark/run-concurrency-sweep.sh
+kubectl -n monitoring port-forward svc/benchmark-pushgateway-prometheus-pushgateway 9091:9091
 ```
 
-The script tests max concurrency 1, 2, 4, 8, 16 and 32 at a fixed prompt count, with a 180-second cooldown between tests. The GitHub Actions benchmark Pod sets `PUSHGATEWAY_URL`, `PUBLISH_RUN_ID`, and `PUBLISHER_SCRIPT` so every completed test is published immediately. When running the script locally without those variables, it only updates the CSV.
-`--max-concurrency` limits clients in flight; it is **not actual scheduler batch size**.
-It uses streaming results so TPOT is measurable. Random inputs are synthetic,
-and model output lengths may differ from the requested length. Warmups and
-multiple repetitions are recommended before interpreting trends.
-
-Archive CSV and publish results. Port-forward the Pushgateway Service to localhost
-(use the name discovered from the cluster, often `benchmark-pushgateway`):
+Then, from the repository root, publish the already-recorded results (requires `prometheus-client`):
 
 ```bash
-kubectl -n monitoring port-forward svc/benchmark-pushgateway 9091:9091
-# In a separate terminal, from repo root:
 python3 -m pip install prometheus-client
-python3 benchmarks/final-benchmark/publish-metrics.py --run-id l4-qwen-run01 \
+python3 benchmarks/final-benchmark/publish-metrics.py \
+  --results-dir benchmarks/final-benchmark/results \
+  --run-id l4-qwen-run01 \
   --gateway localhost:9091
 ```
 
-To create CSV without Pushgateway:
+To regenerate just the CSV from archived JSON without publishing metrics:
+
 ```bash
-python3 benchmarks/final-benchmark/publish-metrics.py --run-id l4-qwen-run01 --archive-only
+python3 benchmarks/final-benchmark/publish-metrics.py \
+  --results-dir benchmarks/final-benchmark/results \
+  --run-id l4-qwen-run01 --archive-only
 ```
 
 ### Validate in Prometheus
