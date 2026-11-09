@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type RUN_BENCHMARK; requires running GKE vLLM and a separate registered GPU runner"
+        description: "Type RUN_BENCHMARK; runs the official benchmark inside the existing GKE vLLM GPU pod"
         required: true
         type: string
 
@@ -18,9 +18,8 @@ concurrency:
 jobs:
   benchmark:
     if: "${{ inputs.confirmation == 'RUN_BENCHMARK' }}"
-    # Register a separate GPU-equipped machine (e.g. RunPod) with this label.
-    # The GPU node serving vLLM on GKE stays unchanged.
-    runs-on: [self-hosted, linux, x64, gpu-benchmark]
+    # GitHub-hosted runner orchestrates; vllm bench serve executes in the existing GKE GPU pod.
+    runs-on: ubuntu-latest
     timeout-minutes: 100
     permissions:
       contents: read
@@ -70,53 +69,86 @@ jobs:
           helm upgrade --install benchmark-pushgateway prometheus-community/prometheus-pushgateway \
             -n monitoring -f benchmarks/final-benchmark/pushgateway-values.yaml \
             --wait --timeout 6m
-      - name: Verify separate GPU benchmark runner
-        run: |
-          set -euo pipefail
-          nvidia-smi
-          command -v vllm
-          command -v python3
-          command -v kubectl
-          vllm --version
-          python3 -m pip install -q prometheus-client
-          echo "Benchmark is running outside GKE on a dedicated GPU-enabled self-hosted runner."
-      - name: Run official vLLM bench serve via authenticated GKE tunnels
+      - name: Install benchmark metrics publisher
+        run: python3 -m pip install --disable-pip-version-check --quiet prometheus-client
+      - name: Run official vLLM benchmark inside existing GPU serving pod
         env:
           BASE_URL: http://127.0.0.1:8000
           MODEL: Qwen/Qwen3-0.6B
-          RESULT_DIR: benchmarks/final-benchmark/results
-          PUSHGATEWAY_URL: 127.0.0.1:9091
           PUBLISHER_SCRIPT: benchmarks/final-benchmark/publish-metrics.py
-          PUBLISH_RUN_ID: ${{ env.RUN_ID }}
+          PUSHGATEWAY_URL: 127.0.0.1:9091
         run: |
           set -euo pipefail
-          mkdir -p "$RESULT_DIR"
+          mkdir -p "$RESULTS"
 
-          # Tunnels are bound only to the runner's loopback interface;
-          # neither the vLLM service nor Pushgateway is publicly exposed.
-          kubectl port-forward -n default svc/learning-vllm 8000:8000 \
-            --address=127.0.0.1 > /tmp/vllm-portforward.log 2>&1 &
-          VLLM_PF=$!
-          kubectl port-forward -n monitoring svc/benchmark-pushgateway-prometheus-pushgateway 9091:9091 \
+          # Only the Pushgateway needs a local tunnel: vLLM client executes
+          # in the serving pod and contacts the server via localhost.
+          kubectl port-forward -n monitoring \
+            svc/benchmark-pushgateway-prometheus-pushgateway 9091:9091 \
             --address=127.0.0.1 > /tmp/pushgateway-portforward.log 2>&1 &
           PUSH_PF=$!
-          trap 'kill "$VLLM_PF" "$PUSH_PF" 2>/dev/null || true' EXIT
+          trap 'kill "$PUSH_PF" 2>/dev/null || true' EXIT
 
-          ready=0
+          READY=0
           for i in $(seq 1 40); do
-            if curl -fsS --max-time 3 http://127.0.0.1:8000/v1/models >/dev/null &&
-               curl -fsS --max-time 3 http://127.0.0.1:9091/-/healthy >/dev/null; then
-              ready=1
+            if curl -fsS --max-time 3 http://127.0.0.1:9091/-/healthy >/dev/null; then
+              READY=1
               break
             fi
             sleep 3
           done
-          if [[ "$ready" -ne 1 ]]; then
-            cat /tmp/vllm-portforward.log /tmp/pushgateway-portforward.log
+          if [[ "$READY" -ne 1 ]]; then
+            cat /tmp/pushgateway-portforward.log
             exit 1
           fi
 
-          bash benchmarks/final-benchmark/run-concurrency-sweep.sh
+          # Executed inside the EXISTING inference pod, not on an extra GPU,
+          # not in a second benchmark pod, and not on the CPU node.
+          POD=$(kubectl get pods -n default -l app.kubernetes.io/instance=learning \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [[ -z "$POD" ]]; then
+            POD=$(kubectl get pod -n default -o name | grep '/learning-vllm-' | head -n 1 | cut -d/ -f2)
+          fi
+          test -n "$POD"
+          echo "Running official vLLM benchmark inside $POD (shared serving GPU)"
+          REMOTE_DIR="/tmp/final-benchmark-$RUN_ID"
+          kubectl exec -n default "$POD" -- mkdir -p "$REMOTE_DIR"
+
+          LEVELS=(1 2 4 8 16 32)
+          for i in "${!LEVELS[@]}"; do
+            c="${LEVELS[$i]}"
+            echo "=== concurrency=$c: 128 requests, input=512, output=256 ==="
+            kubectl exec -n default "$POD" -- vllm bench serve \
+              --backend openai-chat \
+              --endpoint /v1/chat/completions \
+              --base-url "$BASE_URL" \
+              --model "$MODEL" \
+              --dataset-name random \
+              --random-input-len 512 \
+              --random-output-len 256 \
+              --num-prompts 128 \
+              --request-rate inf \
+              --max-concurrency "$c" \
+              --percentile-metrics ttft,tpot \
+              --metric-percentiles 95 \
+              --save-result \
+              --result-dir "$REMOTE_DIR" \
+              --result-filename "concurrency-$c.json"
+
+            # Stream each finished JSON result directly into GitHub runner storage
+            # before continuing. Failure still preserves earlier completed levels.
+            kubectl exec -n default "$POD" -- \
+              cat "$REMOTE_DIR/concurrency-$c.json" > "$RESULTS/concurrency-$c.json"
+            python3 "$PUBLISHER_SCRIPT" \
+              --results-dir "$RESULTS" \
+              --run-id "$RUN_ID" \
+              --gateway "$PUSHGATEWAY_URL"
+
+            if (( i + 1 < ${#LEVELS[@]} )); then
+              echo "Cooldown for 180 seconds"
+              sleep 180
+            fi
+          done
       - name: Archive JSON and CSV as GitHub artifact
         if: always()
         uses: actions/upload-artifact@v4
