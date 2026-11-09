@@ -1187,6 +1187,17 @@
               "queryOptions": {},
               "transformations": [
                 {
+                  "id": "filterFieldsByName",
+                  "options": {
+                    "include": {
+                      "names": [
+                        "concurrency",
+                        "Value"
+                      ]
+                    }
+                  }
+                },
+                {
                   "id": "joinByField",
                   "options": {
                     "byField": "concurrency",
@@ -1220,14 +1231,14 @@
                   "options": {
                     "excludeByName": {
                       "Time": true,
-                      "run_id": true,
-                      "job": true,
-                      "instance": true
+                      "Time 1": true,
+                      "Time 2": true
                     },
                     "renameByName": {
                       "Value #A": "Mean TTFT",
                       "Value #B": "P95 TTFT",
-                      "Value": "Mean TTFT"
+                      "Value 1": "Mean TTFT",
+                      "Value 2": "P95 TTFT"
                     },
                     "indexByName": {
                       "concurrency": 0
@@ -1358,6 +1369,17 @@
               "queryOptions": {},
               "transformations": [
                 {
+                  "id": "filterFieldsByName",
+                  "options": {
+                    "include": {
+                      "names": [
+                        "concurrency",
+                        "Value"
+                      ]
+                    }
+                  }
+                },
+                {
                   "id": "joinByField",
                   "options": {
                     "byField": "concurrency",
@@ -1391,14 +1413,14 @@
                   "options": {
                     "excludeByName": {
                       "Time": true,
-                      "run_id": true,
-                      "job": true,
-                      "instance": true
+                      "Time 1": true,
+                      "Time 2": true
                     },
                     "renameByName": {
                       "Value #A": "Mean TPOT",
                       "Value #B": "P95 TPOT",
-                      "Value": "Mean TPOT"
+                      "Value 1": "Mean TPOT",
+                      "Value 2": "P95 TPOT"
                     },
                     "indexByName": {
                       "concurrency": 0
