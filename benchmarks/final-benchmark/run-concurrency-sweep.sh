@@ -14,6 +14,7 @@ for i in "${!CONCURRENCY_LEVELS[@]}"; do
   echo "Starting synthetic sweep concurrency=$c"
   vllm bench serve \
     --backend openai-chat \
+    --endpoint /v1/chat/completions \
     --base-url "$BASE_URL" \
     --model "$MODEL" \
     --dataset-name random \
