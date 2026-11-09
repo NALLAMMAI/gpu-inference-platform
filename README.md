@@ -206,6 +206,25 @@ All three runs were single trials. Shared prompt prefixes and repeated scenarios
 - [Recorded results JSON](benchmarks/final-results.json)
 - [Benchmark Python script](benchmarks/final-benchmark.py)
 
+### Official vLLM concurrency sweep — November 8, 2026
+
+**[View the 14-panel Grafana benchmark snapshot](https://snapshots.raintank.io/dashboard/snapshot/2byWLRtxB1OAgjZseZNeXhtIgRnvNNFh)** (public, read-only, historical snapshot; not a live dashboard).
+
+The **November 8, 2026** benchmark ran the official `vllm bench serve` client inside the `learning-vllm` pod on the NVIDIA L4 node, targeting `127.0.0.1:8000/v1/chat/completions` (not the FastAPI gateway). It used **128 requests at each of six concurrency levels** (768/768 completed), synthetic requests of **512 input tokens** and **256 output tokens**, with approximately **180 seconds between levels**. Results were published to Pushgateway, collected in Prometheus, and visualized in Grafana. The co-located client may consume GPU-node CPU/RAM, so these figures should not be interpreted as isolated server-only capacity.
+
+| Concurrent requests | Output tokens/s | Requests/s | Mean TTFT (ms) | P95 TTFT (ms) | Mean TPOT (ms) | P95 TPOT (ms) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 132.87 | 0.52 | 60.36 | 69.01 | 7.32 | 7.39 |
+| 2 | 252.97 | 0.99 | 47.36 | 58.02 | 7.74 | 7.84 |
+| 4 | 451.67 | 1.76 | 78.04 | 102.51 | 8.48 | 8.58 |
+| 8 | 760.81 | 2.97 | 109.21 | 185.30 | 9.92 | 10.12 |
+| 16 | 1,179.06 | 4.61 | 166.97 | 368.55 | 12.56 | 12.99 |
+| 32 | 1,611.44 | 6.30 | 244.34 | 740.52 | 18.28 | 18.95 |
+
+**Findings:** Aggregate output throughput increased **12.1×**, from 132.87 to 1,611.44 output tokens/s (concurrency 1 → 32). Meanwhile mean TPOT increased from **7.32 to 18.28 ms** and P95 TTFT from **69.01 to 740.52 ms**. Going from concurrency 16 to 32 increased output throughput by approximately **37%** while mean TPOT rose approximately **46%**, illustrating diminishing throughput gains and a throughput–latency tradeoff. Mean and P95 TPOT remained relatively close, whereas the TTFT tail widened markedly at higher load. This was one run per concurrency level, not a repeated statistical comparison; no saturation ceiling or production-safe concurrency target was established.
+
+Dashboard plots include output and request throughput, **combined Mean/P95 TTFT**, **combined Mean/P95 TPOT**, and throughput versus mean TPOT, alongside live GPU/vLLM telemetry. The latest editable dashboard definition is [`monitoring/gpu-inference-dashboard.benchmark.json`](monitoring/gpu-inference-dashboard.benchmark.json). The [official benchmark workflow](.github/workflows/run-final-benchmark.yml) and [benchmark metrics publisher](benchmarks/) provide the reproducible pipeline.
+
 ## Interactive Grafana benchmark dashboard
 
 **[View the public Grafana snapshot — GPU Inference (November 5, 2026)](https://snapshots.raintank.io/dashboard/snapshot/9WBYMrSxAy3BhRiCADuB8eZkMJL1tYhx)**
