@@ -20,7 +20,7 @@ resource "google_container_node_pool" "cpu" {
   node_config {
     machine_type = "e2-standard-2"
     image_type   = "COS_CONTAINERD"
-    disk_size_gb = 50
+    disk_size_gb = 100
     oauth_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
   }
 }
