@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fake-vllm",
+      "runtimeExecutable": "make",
+      "runtimeArgs": ["run-fake-vllm"],
+      "port": 8001
+    },
+    {
+      "name": "gateway",
+      "runtimeExecutable": "make",
+      "runtimeArgs": ["run-gateway"],
+      "port": 8080
+    }
+  ]
+}
