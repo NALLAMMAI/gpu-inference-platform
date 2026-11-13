@@ -1,0 +1,37 @@
+[project]
+name = "gpu-inference-platform"
+version = "0.1.0"
+description = "Local development tooling for the GKE vLLM inference platform (gateway tests, fake vLLM)."
+readme = "README.md"
+# Matches the gateway container image (python:3.12-slim).
+requires-python = ">=3.12,<3.13"
+# Same pins as the gateway's pip install in helm/gateway/templates/deployment.yaml.
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn==0.34.2",
+    "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.2",
+    "ruff==0.14.6",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+# tests/smoke_test.py is a script for a live cluster, not a pytest module.
+testpaths = ["tests/gateway"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+# Lint only the Python developed with this tooling; benchmark scripts are
+# kept as they were run.
+include = ["dev/**/*.py", "tests/**/*.py", "helm/gateway/files/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

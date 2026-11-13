@@ -29,22 +29,32 @@ For Claude Code, these rules are enforced in [`.claude/settings.json`](.claude/s
 
 ## Working locally (no cluster needed)
 
-These checks need no GPU or cloud access. CI runs the same ones in `.github/workflows/validate.yml`.
+These checks need no GPU or cloud access. CI runs the same ones in `.github/workflows/validate.yml`. Python tooling uses [uv](https://docs.astral.sh/uv/) and Python 3.12, matching the gateway image.
 
 ```bash
-# Terraform formatting and validation (no backend)
-terraform -chdir=terraform fmt -check
-terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
-
-# Helm charts
-helm lint helm/vllm && helm template learning helm/vllm > /dev/null
-helm lint helm/gateway && helm template learning-gateway helm/gateway > /dev/null
-
-# Python syntax check for gateway, tests, and benchmark scripts
-python3 -m py_compile helm/gateway/files/main.py tests/*.py benchmarks/*.py benchmarks/final-benchmark/*.py
+make setup        # uv sync: .venv with gateway deps, pytest, ruff
+make check        # ruff lint + format check, gateway tests; helm/terraform checks if installed
+make test         # gateway tests only
+make fmt          # apply ruff fixes and formatting
+make helm-check   # helm lint + template for both charts (needs helm)
+make tf-check     # terraform fmt -check + validate, no backend (needs terraform)
 ```
 
-`helm` and `terraform` may not be installed on the developer's Mac. If they're missing, say so rather than skipping the check silently.
+`helm` and `terraform` may not be installed on the developer's Mac. `make check` says when it skips them. Report that instead of claiming they passed.
+
+**Fake vLLM.** `dev/fake_vllm.py` imitates the vLLM endpoints this repo uses (`/health`, `/v1/models`, `/v1/chat/completions` with and without `"stream": true`, and `/metrics` with `vllm:*` gauges). It has configurable time-to-first-token and per-token delays (`FAKE_VLLM_TTFT_MS`, `FAKE_VLLM_TPOT_MS`). Use it to develop the gateway without a GPU:
+
+```bash
+make run-fake-vllm   # terminal 1: fake vLLM on 127.0.0.1:8001
+make run-gateway     # terminal 2: gateway on 127.0.0.1:8080 -> fake vLLM, auto-reload
+make smoke-local     # terminal 3: tests/smoke_test.py through the local gateway
+```
+
+The same two servers are defined in `.claude/launch.json` (`fake-vllm`, `gateway`).
+
+**Gateway tests** (`tests/gateway/`) run the real `helm/gateway/files/main.py` and the fake vLLM as uvicorn servers on free ports and test them over HTTP. Known gaps (streaming passthrough, `/metrics`, request IDs) are `xfail(strict=True)`. When you implement one, its test passes, pytest reports XPASS as a failure, and you must remove the marker.
+
+Fake-vLLM results say nothing about real latency or throughput. Benchmarks need the real cluster.
 
 Against a running cluster, with a port-forward open: `python3 tests/smoke_test.py` (vLLM on :8000 by default, or set `VLLM_BASE_URL=http://localhost:8080` for the gateway).
 
@@ -54,7 +64,7 @@ Against a running cluster, with a port-forward open: `python3 tests/smoke_test.p
 - **Pin versions.** Container image tags, Helm chart versions, and Python packages are pinned. Keep them pinned when adding new ones.
 - **Keep workloads on the right pool.** Only vLLM (and DCGM Exporter, which doesn't request the GPU) goes on `gpu-l4-pool`. Everything else uses `nodeSelector: cloud.google.com/gke-nodepool: cpu-pool`.
 - **Workflows that change infrastructure** take a `workflow_dispatch` confirmation string (for example `START_GPU_PLATFORM`, `DESTROY_GKE`, `RUN_BENCHMARK`) and share the `terraform-gke-state` concurrency group. Follow the same pattern for new ones.
-- **Gateway changes:** edit `helm/gateway/files/main.py`. The Deployment's checksum annotation restarts the pod when it changes. Add new Python dependencies to the `pip install` line in `helm/gateway/templates/deployment.yaml`, with pinned versions.
+- **Gateway changes:** edit `helm/gateway/files/main.py` and run `make check`. The Deployment's checksum annotation restarts the pod when it changes. Add new Python dependencies, with pinned versions, to **both** the `pip install` line in `helm/gateway/templates/deployment.yaml` and `pyproject.toml` (then `uv lock`).
 - **Benchmark results** are committed as raw JSON/CSV next to the script that produced them, and summarised in `benchmarks/README.md` and the main README.
 - Commit messages are short imperative sentences describing the change (see `git log`).
 
@@ -64,7 +74,8 @@ Against a running cluster, with a port-forward open: `python3 tests/smoke_test.p
 | --- | --- |
 | Cluster, node pools, GPU count | `terraform/main.tf`, `terraform/variables.tf` |
 | vLLM args, image, GPU scheduling | `helm/vllm/values.yaml`, `helm/vllm/templates/deployment.yaml` |
-| Gateway behaviour | `helm/gateway/files/main.py` |
+| Gateway behaviour | `helm/gateway/files/main.py`, tests in `tests/gateway/` |
+| Local dev servers, Python deps | `Makefile`, `pyproject.toml`, `dev/fake_vllm.py` |
 | Start / scale / deploy / destroy | `.github/workflows/` (`start-platform.yml` is the all-in-one) |
 | Official benchmark pipeline | `.github/workflows/run-final-benchmark.yml`, `benchmarks/final-benchmark/` |
 | Monitoring setup and verification | `monitoring/README.md`, `benchmarks/final-benchmark/benchmark-monitoring.md` |
