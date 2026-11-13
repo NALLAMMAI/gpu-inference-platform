@@ -9,3 +9,6 @@ crash.log
 __pycache__/
 .pytest_cache/
 .DS_Store
+
+# Claude Code per-developer settings
+.claude/settings.local.json
