@@ -23,9 +23,9 @@ This project runs on a personal GCP account. A running L4 node costs real money 
 - Read-only cluster commands (`kubectl get/describe/logs`, `helm list/status`) are fine **if** the human says the cluster is running. Do not assume it exists.
 - Never commit `*.tfstate`, `*.tfvars` (except `*.tfvars.example`), `.env`, keys, tokens, or kubeconfig files.
 - Do not hardcode the GCP project ID or state bucket name in new files. Use `vars.GCP_PROJECT_ID` in workflows and placeholders in docs.
-- Never trigger workflows (`gh workflow run`, `gh run rerun`) or change repo secrets and variables. Most workflows create, scale, or destroy billable resources.
+- Trigger a workflow (`gh workflow run`, `gh run rerun`) only when the human asks for it in the conversation. Before running it, say which workflow it is, its inputs (including the confirmation string), and whether it creates, scales, or destroys billable resources. Never trigger one on your own initiative. Never change repo secrets or variables.
 
-For Claude Code, these rules are enforced in [`.claude/settings.json`](.claude/settings.json): read-only commands are pre-approved, pushes to `main`, merges, `kubectl exec` and `terraform plan` ask first, and destructive commands plus reads of state, tfvars, `.env` and credential files are denied. Per-developer overrides go in `.claude/settings.local.json`, which is git-ignored. These rules match commands by text, so they're a guardrail, not a security boundary. Follow the rules above even when a command form isn't covered.
+For Claude Code, these rules are enforced in [`.claude/settings.json`](.claude/settings.json): read-only commands are pre-approved; pushes to `main`, merges, workflow runs, `kubectl exec` and `terraform plan` ask first; destructive commands plus reads of state, tfvars, `.env` and credential files are denied. Per-developer overrides go in `.claude/settings.local.json`, which is git-ignored. These rules match commands by text, so they're a guardrail, not a security boundary. Follow the rules above even when a command form isn't covered.
 
 ## Working locally (no cluster needed)
 
