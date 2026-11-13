@@ -74,6 +74,7 @@ The GPU pool can exist with **zero worker nodes**. CPU-only infrastructure still
 | [`monitoring/`](monitoring/) | Prometheus/Grafana Helm values, DCGM Exporter, vLLM ServiceMonitor and original Grafana dashboard |
 | [`tests/`](tests/) | Inference smoke-test script |
 | [`.github/workflows/`](.github/workflows/) | Validation, provision, scale, deploy, destroy, and combined startup workflows |
+| [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) | Guide for AI coding agents: architecture, safety rules for billable resources, local checks, conventions |
 
 ## Start the platform
 
