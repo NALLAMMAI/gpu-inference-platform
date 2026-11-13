@@ -23,7 +23,7 @@ package = false
 
 [tool.pytest.ini_options]
 # tests/smoke_test.py is a script for a live cluster, not a pytest module.
-testpaths = ["tests/gateway"]
+testpaths = ["tests/gateway", "tests/hooks"]
 addopts = "-q"
 
 [tool.ruff]
@@ -31,7 +31,7 @@ line-length = 110
 target-version = "py312"
 # Lint only the Python developed with this tooling; benchmark scripts are
 # kept as they were run.
-include = ["dev/**/*.py", "tests/**/*.py", "helm/gateway/files/*.py"]
+include = ["dev/**/*.py", "tests/**/*.py", "helm/gateway/files/*.py", ".claude/hooks/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
