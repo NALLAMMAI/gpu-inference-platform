@@ -76,6 +76,7 @@ The GPU pool can exist with **zero worker nodes**. CPU-only infrastructure still
 | [`dev/`](dev/), [`Makefile`](Makefile), [`pyproject.toml`](pyproject.toml) | Local development without a GPU: fake vLLM server, `make check` / `make run-gateway`, Python deps via uv |
 | [`.github/workflows/`](.github/workflows/) | Validation, provision, scale, deploy, destroy, and combined startup workflows |
 | [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) | Guide for AI coding agents: architecture, safety rules for billable resources, local checks, conventions |
+| [`.claude/`](.claude/) | Claude Code permission rules, hooks that block destructive cloud commands and auto-format Python, local dev server definitions |
 
 ## Start the platform
 
