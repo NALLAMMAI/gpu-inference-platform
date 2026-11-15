@@ -64,18 +64,54 @@ def test_streamed_response_content_arrives_intact(gateway):
     assert text == "token token token token"
 
 
-@pytest.mark.xfail(strict=True, reason="Gateway buffers the full upstream response; no streaming yet")
 def test_streaming_first_chunk_arrives_before_generation_finishes(gateway, fast_vllm):
     fast_vllm.TPOT_S = 0.05  # 20 tokens -> about 1 s of generation
     start = time.perf_counter()
     with gateway.stream("POST", "/v1/chat/completions", json=chat_body(stream=True, max_tokens=20)) as r:
-        first_chunk = next(r.iter_bytes())
+        assert r.headers["content-type"].startswith("text/event-stream")
+        chunks = r.iter_bytes()
+        first_chunk = next(chunks)
         time_to_first_chunk = time.perf_counter() - start
         assert first_chunk
-        for _ in r.iter_bytes():
+        for _ in chunks:
             pass
     total = time.perf_counter() - start
     assert time_to_first_chunk < total / 2
+
+
+def test_streaming_upstream_error_is_passed_through(gateway):
+    r = gateway.post("/v1/chat/completions", json=chat_body(stream=True, model="no-such-model"))
+    assert r.status_code == 404
+    assert "does not exist" in r.json()["error"]["message"]
+
+
+def test_stream_false_is_not_streamed(gateway):
+    r = gateway.post("/v1/chat/completions", json=chat_body(stream=False, max_tokens=3))
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/json")
+    assert r.json()["choices"][0]["message"]["content"] == "token token token"
+
+
+def test_connection_pool_is_shared_across_requests(gateway, gateway_module):
+    gateway.get("/v1/models")
+    first_client = gateway_module._client
+    gateway.post("/v1/chat/completions", json=chat_body(max_tokens=2))
+    gateway.post("/v1/chat/completions", json=chat_body(stream=True, max_tokens=2))
+    assert first_client is not None
+    assert gateway_module._client is first_client
+    assert not first_client.is_closed
+
+
+def test_client_disconnect_stops_upstream_generation(gateway, fast_vllm):
+    fast_vllm.TPOT_S = 0.02  # 64 tokens -> about 1.3 s if generation is not stopped
+    with gateway.stream("POST", "/v1/chat/completions", json=chat_body(stream=True, max_tokens=64)) as r:
+        next(r.iter_bytes())
+        assert fast_vllm._state["running"] == 1
+    # Leaving the block closes the client connection mid-stream.
+    deadline = time.monotonic() + 1.0
+    while fast_vllm._state["running"] and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert fast_vllm._state["running"] == 0
 
 
 @pytest.mark.xfail(strict=True, reason="Gateway exposes no Prometheus /metrics endpoint yet")

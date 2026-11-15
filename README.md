@@ -230,6 +230,20 @@ The **November 8, 2026** benchmark ran the official `vllm bench serve` client in
 
 Dashboard plots include output and request throughput, **combined Mean/P95 TTFT**, **combined Mean/P95 TPOT**, and throughput versus mean TPOT, alongside live GPU/vLLM telemetry. The latest editable dashboard definition is [`monitoring/gpu-inference-dashboard.benchmark.json`](monitoring/gpu-inference-dashboard.benchmark.json). The [official benchmark workflow](.github/workflows/run-final-benchmark.yml) and [benchmark metrics publisher](benchmarks/) provide the reproducible pipeline.
 
+### Gateway streaming fix — local measurement, November 15, 2026
+
+Until this change, the FastAPI gateway read vLLM's **entire** response before returning anything. For `"stream": true` requests this meant every token reached the client at once, at the end. **Time to first token through the gateway was roughly the full response time.** None of the benchmarks above were affected: the Nov 4 load tests didn't request streaming, and the Nov 5 and Nov 8 benchmarks bypassed the gateway.
+
+The gateway now forwards streamed chunks as vLLM sends them, reuses one connection pool, and closes the upstream request if the client disconnects, so vLLM can stop generating. Measured locally with [`dev/ttft_probe.py`](dev/ttft_probe.py) against the **fake vLLM**, configured to resemble the Nov 8 L4 concurrency-1 means (60 ms TTFT, 7.3 ms per token, 256 tokens). This shows a 10-request sequential run, not a GPU measurement:
+
+| Path | Mean TTFT (ms) | P95 TTFT (ms) |
+| --- | ---: | ---: |
+| Fake vLLM direct | 63.2 | 63.9 |
+| Gateway, **before** (buffered) | 2,219.4 | 2,225.9 |
+| Gateway, **after** (streaming passthrough) | 65.8 | 67.1 |
+
+After the change, the gateway adds about **1.6 ms** of TTFT relative to the direct path in the same run (64.2 ms direct). Raw results: [`benchmarks/gateway-streaming/local-2026-11-15.json`](benchmarks/gateway-streaming/local-2026-11-15.json). **Not yet verified on GKE.** The next cluster session should run `dev/ttft_probe.py` against both the gateway and vLLM port-forwards.
+
 ## Interactive Grafana benchmark dashboard
 
 **[View the public Grafana snapshot — GPU Inference (November 5, 2026)](https://snapshots.raintank.io/dashboard/snapshot/9WBYMrSxAy3BhRiCADuB8eZkMJL1tYhx)**

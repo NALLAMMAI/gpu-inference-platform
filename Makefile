@@ -4,7 +4,7 @@
 FAKE_VLLM_PORT ?= 8001
 GATEWAY_PORT ?= 8080
 
-.PHONY: help setup test lint fmt helm-check tf-check check run-fake-vllm run-gateway smoke-local
+.PHONY: help setup test lint fmt helm-check tf-check check run-fake-vllm run-gateway smoke-local ttft-local
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
@@ -47,3 +47,6 @@ run-gateway: ## Gateway on 127.0.0.1:$(GATEWAY_PORT), forwarding to the fake vLL
 
 smoke-local: ## Run tests/smoke_test.py against the local gateway
 	VLLM_BASE_URL=http://127.0.0.1:$(GATEWAY_PORT) uv run python tests/smoke_test.py
+
+ttft-local: ## Measure streaming TTFT through the local gateway (dev/ttft_probe.py)
+	uv run python dev/ttft_probe.py --url http://127.0.0.1:$(GATEWAY_PORT)

@@ -8,7 +8,7 @@ A learning and portfolio project that serves an OpenAI-compatible LLM API on Goo
 
 - **Terraform** (`terraform/`) creates a GKE Standard cluster `gpu-inference-learning` in `us-central1-a` with a CPU pool (`cpu-pool`, 1 × e2-standard-2) and an NVIDIA L4 pool (`gpu-l4-pool`, 0 or 1 × g2-standard-4). State lives in a GCS bucket.
 - **vLLM** (`helm/vllm/`, release `learning`) serves `Qwen/Qwen3-0.6B` on the L4. Service `learning-vllm:8000`, routes `/v1/models`, `/v1/chat/completions`, `/health`, `/metrics`.
-- **FastAPI gateway** (`helm/gateway/`, release `learning-gateway`) runs on the CPU pool and forwards requests to vLLM. Service `learning-gateway-gateway:8080`. Its code is `helm/gateway/files/main.py`, shipped in a ConfigMap and installed with `pip` at pod start (no custom image yet).
+- **FastAPI gateway** (`helm/gateway/`, release `learning-gateway`) runs on the CPU pool and forwards requests to vLLM. Service `learning-gateway-gateway:8080`. Its code is `helm/gateway/files/main.py`, shipped in a ConfigMap and installed with `pip` at pod start (no custom image yet). It forwards `"stream": true` responses chunk by chunk through one shared httpx connection pool. Timeouts come from `GATEWAY_CONNECT_TIMEOUT_S` (default 5) and `GATEWAY_READ_TIMEOUT_S` (default 120, the maximum gap between chunks).
 - **Monitoring** (`monitoring/`): kube-prometheus-stack (release `monitoring`, namespace `monitoring`), NVIDIA DCGM Exporter on the GPU node, and a vLLM ServiceMonitor. Grafana dashboards are stored as JSON.
 - **Benchmarks** (`benchmarks/`): early load tests, plus the official `vllm bench serve` concurrency sweep in `benchmarks/final-benchmark/` (results, Pushgateway publisher, dashboard).
 - **GitHub Actions** (`.github/workflows/`) is the only way infrastructure is created, scaled, deployed, benchmarked, or destroyed. Workflows authenticate with OIDC / Workload Identity Federation using repo variables `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`.
@@ -55,11 +55,12 @@ make tf-check     # terraform fmt -check + validate, no backend (needs terraform
 make run-fake-vllm   # terminal 1: fake vLLM on 127.0.0.1:8001
 make run-gateway     # terminal 2: gateway on 127.0.0.1:8080 -> fake vLLM, auto-reload
 make smoke-local     # terminal 3: tests/smoke_test.py through the local gateway
+make ttft-local      # terminal 3: streaming TTFT/total latency via dev/ttft_probe.py
 ```
 
 The same two servers are defined in `.claude/launch.json` (`fake-vllm`, `gateway`).
 
-**Gateway tests** (`tests/gateway/`) run the real `helm/gateway/files/main.py` and the fake vLLM as uvicorn servers on free ports and test them over HTTP. Known gaps (streaming passthrough, `/metrics`, request IDs) are `xfail(strict=True)`. When you implement one, its test passes, pytest reports XPASS as a failure, and you must remove the marker.
+**Gateway tests** (`tests/gateway/`) run the real `helm/gateway/files/main.py` and the fake vLLM as uvicorn servers on free ports and test them over HTTP. Known gaps (`/metrics`, request IDs) are `xfail(strict=True)`. When you implement one, its test passes, pytest reports XPASS as a failure, and you must remove the marker.
 
 Fake-vLLM results say nothing about real latency or throughput. Benchmarks need the real cluster.
 
