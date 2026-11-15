@@ -27,6 +27,13 @@ This project runs on a personal GCP account. A running L4 node costs real money 
 
 For Claude Code, these rules are enforced in [`.claude/settings.json`](.claude/settings.json): read-only commands are pre-approved; pushes to `main`, merges, workflow runs, `kubectl exec` and `terraform plan` ask first; destructive commands plus reads of state, tfvars, `.env` and credential files are denied. Per-developer overrides go in `.claude/settings.local.json`, which is git-ignored. These rules match commands by text, so they're a guardrail, not a security boundary. Follow the rules above even when a command form isn't covered.
 
+Two Claude Code hooks in [`.claude/hooks/`](.claude/hooks/) (registered in `.claude/settings.json`) back this up:
+
+- **`guard_destructive.py`** (`PreToolUse`, Bash): parses the **whole** command (`&&`/`;`/`|` chains, newlines, `bash -c '…'`, `eval`, `$(…)` and backticks, `env`/`sudo`/`timeout` wrappers, full paths such as `/usr/local/bin/terraform`) and blocks any simple command that runs `terraform apply/destroy/import/state rm…`, `kubectl delete/apply/scale/patch/rollout restart…`, `helm install/upgrade/uninstall/rollback`, `gcloud … create/delete/update/resize` or IAM-policy changes, `gh secret/variable set|delete`, `gh repo delete`, or a force or delete push. Words that only appear as data, such as commit messages, `grep` patterns, `echo` text and heredoc bodies, are ignored. It exits 2 with a message telling the agent to use the workflows and ask the human. Tests: `tests/hooks/`.
+- **`format_python.py`** (`PostToolUse`, Edit/Write): runs `ruff format` and `ruff check --fix` on an edited `.py` file in ruff's scope. If ruff finds something it can't fix, it reports it back to the agent.
+
+If you change `BLOCKED` in the guard, add cases to `tests/hooks/test_guard_destructive.py`, both commands that must be blocked and look-alikes that must not be.
+
 ## Working locally (no cluster needed)
 
 These checks need no GPU or cloud access. CI runs the same ones in `.github/workflows/validate.yml`. Python tooling uses [uv](https://docs.astral.sh/uv/) and Python 3.12, matching the gateway image.
@@ -76,6 +83,7 @@ Against a running cluster, with a port-forward open: `python3 tests/smoke_test.p
 | vLLM args, image, GPU scheduling | `helm/vllm/values.yaml`, `helm/vllm/templates/deployment.yaml` |
 | Gateway behaviour | `helm/gateway/files/main.py`, tests in `tests/gateway/` |
 | Local dev servers, Python deps | `Makefile`, `pyproject.toml`, `dev/fake_vllm.py` |
+| Agent permissions and hooks | `.claude/settings.json`, `.claude/hooks/`, tests in `tests/hooks/` |
 | Start / scale / deploy / destroy | `.github/workflows/` (`start-platform.yml` is the all-in-one) |
 | Official benchmark pipeline | `.github/workflows/run-final-benchmark.yml`, `benchmarks/final-benchmark/` |
 | Monitoring setup and verification | `monitoring/README.md`, `benchmarks/final-benchmark/benchmark-monitoring.md` |
