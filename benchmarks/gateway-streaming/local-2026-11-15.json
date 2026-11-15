@@ -1,0 +1,79 @@
+{
+  "date": "2026-11-15",
+  "environment": "Local laptop (Apple Silicon). Fake vLLM (dev/fake_vllm.py), not a real model or GPU.",
+  "fake_vllm_settings": {
+    "FAKE_VLLM_TTFT_MS": 60,
+    "FAKE_VLLM_TPOT_MS": 7.3,
+    "FAKE_VLLM_MAX_TOKENS": 256,
+    "note": "Chosen to resemble the Nov 8 L4 concurrency-1 means (60.36 ms TTFT, 7.32 ms TPOT)."
+  },
+  "method": "dev/ttft_probe.py: 1 warm-up + 10 sequential streaming requests, max_tokens=256. 'direct' = fake vLLM on :8001, 'gateway' = gateway on :8080 -> fake vLLM.",
+  "before": "gateway at commit 345a948 (buffers the whole upstream response)",
+  "after": "gateway with streaming passthrough and shared connection pool (this change)",
+  "runs": {
+    "before-direct": {
+      "url": "http://127.0.0.1:8001",
+      "requests": 10,
+      "max_tokens": 256,
+      "ttft_ms": {
+        "mean": 63.178653991781175,
+        "p50": 63.322250032797456,
+        "p95": 63.887333031743765
+      },
+      "total_ms": {
+        "mean": 2207.1378665743396,
+        "p50": 2207.180875004269,
+        "p95": 2210.751749924384
+      },
+      "content_chunks_mean": 256
+    },
+    "before-gateway": {
+      "url": "http://127.0.0.1:8080",
+      "requests": 10,
+      "max_tokens": 256,
+      "ttft_ms": {
+        "mean": 2219.440970814321,
+        "p50": 2219.495333964005,
+        "p95": 2225.894375005737
+      },
+      "total_ms": {
+        "mean": 2220.412450004369,
+        "p50": 2220.5758339259773,
+        "p95": 2226.960749947466
+      },
+      "content_chunks_mean": 256
+    },
+    "after-direct": {
+      "url": "http://127.0.0.1:8001",
+      "requests": 10,
+      "max_tokens": 256,
+      "ttft_ms": {
+        "mean": 64.20855389442295,
+        "p50": 64.45954099763185,
+        "p95": 65.10737491771579
+      },
+      "total_ms": {
+        "mean": 2368.7723955954425,
+        "p50": 2370.248374994844,
+        "p95": 2378.010290907696
+      },
+      "content_chunks_mean": 256
+    },
+    "after-gateway": {
+      "url": "http://127.0.0.1:8080",
+      "requests": 10,
+      "max_tokens": 256,
+      "ttft_ms": {
+        "mean": 65.80089997733012,
+        "p50": 66.10258296132088,
+        "p95": 67.10474996361881
+      },
+      "total_ms": {
+        "mean": 2379.288545716554,
+        "p50": 2380.355207948014,
+        "p95": 2390.003791078925
+      },
+      "content_chunks_mean": 256
+    }
+  }
+}
