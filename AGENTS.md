@@ -88,4 +88,4 @@ Against a running cluster, with a port-forward open: `python3 tests/smoke_test.p
 | Start / scale / deploy / destroy | `.github/workflows/` (`start-platform.yml` is the all-in-one) |
 | Official benchmark pipeline | `.github/workflows/run-final-benchmark.yml`, `benchmarks/final-benchmark/` |
 | Monitoring setup and verification | `monitoring/README.md`, `benchmarks/final-benchmark/benchmark-monitoring.md` |
-| Roadmap | README section "Further work — scaling and reliability" |
+| Roadmap | `docs/ROADMAP.md` (staged plan); README section "Further work — scaling and reliability" |

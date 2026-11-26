@@ -75,6 +75,7 @@ The GPU pool can exist with **zero worker nodes**. CPU-only infrastructure still
 | [`tests/`](tests/) | Inference smoke-test script for a live cluster; gateway tests in [`tests/gateway/`](tests/gateway/) that run locally against a fake vLLM |
 | [`dev/`](dev/), [`Makefile`](Makefile), [`pyproject.toml`](pyproject.toml) | Local development without a GPU: fake vLLM server, `make check` / `make run-gateway`, Python deps via uv |
 | [`.github/workflows/`](.github/workflows/) | Validation, provision, scale, deploy, destroy, and combined startup workflows |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Staged plan: bulk code editing with a self-hosted coder model, from one GPU to batch jobs and fine-tuning |
 | [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) | Guide for AI coding agents: architecture, safety rules for billable resources, local checks, conventions |
 | [`.claude/`](.claude/) | Claude Code permission rules, hooks that block destructive cloud commands and auto-format Python, local dev server definitions |
 
@@ -267,6 +268,8 @@ The repository includes:
 **Reproducibility status:** The monitoring configuration reflects the setup used during the benchmark, but a **clean end-to-end rebuild from the committed files has not been verified**. The normal Start Platform workflow deploys the cluster, vLLM and gateway; it does **not currently install the monitoring stack automatically**. The original dashboard JSON preserves panel definitions and queries, not historical Prometheus samples.
 
 ## Further work — scaling and reliability
+
+The staged plan for the next phase (a self-hosted coder model for bulk code editing, from one L4 to batch jobs and fine-tuning) is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 The current benchmark evaluates **one NVIDIA L4 GPU** with concurrency levels 1–32. Output throughput continued to increase at concurrency 32, but mean TPOT and P95 TTFT rose substantially; the system's saturation point and production-ready capacity have **not** been established.
 
