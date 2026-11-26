@@ -110,7 +110,7 @@ These remain useful for learning and troubleshooting:
 | 3 | [Deploy vLLM](.github/workflows/deploy-vllm.yml) | `DEPLOY_VLLM` |
 | 4 | [Deploy FastAPI Gateway](.github/workflows/deploy-gateway.yml) | Manually dispatch |
 
-**Prerequisites:** A GCP project with billing enabled, the needed GKE/Compute APIs and GPU quotas, the preconfigured GitHub repository variables (`GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`), authorized Workload Identity Federation, and access to the existing GCS backend bucket `gpu-inference-tfstate-4643030840`.
+**Prerequisites:** A GCP project with billing enabled, the needed GKE/Compute APIs and GPU quotas, the preconfigured GitHub repository variables (`GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `TF_STATE_BUCKET`), authorized Workload Identity Federation, and an existing GCS bucket for Terraform state, whose name is set in `TF_STATE_BUCKET`.
 
 ### Verify after startup
 
@@ -118,7 +118,7 @@ In Cloud Shell or another environment authenticated to the project:
 
 ```bash
 gcloud container clusters get-credentials gpu-inference-learning \
-  --zone us-central1-a --project project-36527308-968f-4297-96e
+  --zone us-central1-a --project <YOUR_PROJECT_ID>
 
 kubectl get nodes -o wide
 kubectl get pods -o wide
@@ -290,9 +290,9 @@ It removes the **Terraform-managed** GKE cluster and node pools. When the cluste
 Verify:
 
 ```bash
-gcloud container clusters list --project=project-36527308-968f-4297-96e
-gcloud compute instances list --project=project-36527308-968f-4297-96e
-gcloud compute disks list --project=project-36527308-968f-4297-96e
+gcloud container clusters list --project=<YOUR_PROJECT_ID>
+gcloud compute instances list --project=<YOUR_PROJECT_ID>
+gcloud compute disks list --project=<YOUR_PROJECT_ID>
 ```
 
 Also inspect any independently created disks, load balancers, reserved IPs, NAT resources or storage, and review Google Cloud Billing (which can report costs with a delay). **Do not manually delete the GCS state bucket** if you intend to resume using the existing Terraform workflows.
