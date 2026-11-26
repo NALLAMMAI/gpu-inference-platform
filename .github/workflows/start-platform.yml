@@ -40,7 +40,7 @@ jobs:
       - name: Initialize Terraform GCS backend and validate
         working-directory: terraform
         run: |
-          terraform init -input=false
+          terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
           terraform validate
 
       - name: Step 1 - Create CPU-only GKE cluster
