@@ -1,0 +1,157 @@
+name: Run InstructCoder Benchmark
+
+# Runs benchmarks/instructcoder/load_test.py inside the existing vLLM pod twice,
+# with the same requests: once straight to vLLM (localhost, the engine's numbers)
+# and once through the gateway Service (the platform's numbers). Creates no node;
+# it needs the cluster from start-platform.yml. Installs or updates the monitoring
+# stack and the Pushgateway so the results show up in Grafana.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type RUN_INSTRUCTCODER_BENCHMARK; runs the InstructCoder load test inside the existing vLLM pod"
+        required: true
+        type: string
+      concurrency:
+        description: "Comma-separated concurrency levels"
+        required: false
+        default: "1,2,4,8,16,32"
+        type: string
+      num_requests:
+        description: "Requests per concurrency level"
+        required: false
+        default: "64"
+        type: string
+      cooldown:
+        description: "Seconds to wait between levels and between the two targets"
+        required: false
+        default: "60"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-gke-state
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    if: "${{ inputs.confirmation == 'RUN_INSTRUCTCODER_BENCHMARK' }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RUN_ID: ic-l4-${{ github.run_id }}
+      RESULTS: benchmarks/instructcoder/results/ic-l4-${{ github.run_id }}
+      CONCURRENCY: ${{ inputs.concurrency }}
+      NUM_REQUESTS: ${{ inputs.num_requests }}
+      COOLDOWN: ${{ inputs.cooldown }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check inputs
+        run: |
+          set -euo pipefail
+          [[ "$CONCURRENCY" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "bad concurrency: $CONCURRENCY"; exit 1; }
+          [[ "$NUM_REQUESTS" =~ ^[0-9]+$ ]] || { echo "bad num_requests: $NUM_REQUESTS"; exit 1; }
+          [[ "$COOLDOWN" =~ ^[0-9]+$ ]] || { echo "bad cooldown: $COOLDOWN"; exit 1; }
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          install_components: gke-gcloud-auth-plugin
+      - name: Connect to existing GKE cluster
+        run: |
+          gcloud container clusters get-credentials gpu-inference-learning \
+            --zone us-central1-a --project "${{ vars.GCP_PROJECT_ID }}"
+      - name: Confirm GPU node, vLLM and gateway are ready (no resources created)
+        run: |
+          set -euo pipefail
+          kubectl get nodes -o wide
+          kubectl wait --for=condition=Ready node \
+            -l cloud.google.com/gke-nodepool=gpu-l4-pool --timeout=30s
+          kubectl rollout status deployment/learning-vllm --timeout=45s
+          kubectl rollout status deployment/learning-gateway-gateway --timeout=45s
+      - uses: azure/setup-helm@v4
+      - name: Install monitoring and Pushgateway
+        run: |
+          set -euo pipefail
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add gpu-helm-charts https://nvidia.github.io/dcgm-exporter/helm-charts
+          helm repo update
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+            -n monitoring -f monitoring/stack-values.yaml --wait --timeout 12m
+          kubectl apply -f monitoring/vllm-servicemonitor.yaml
+          helm upgrade --install dcgm-exporter gpu-helm-charts/dcgm-exporter \
+            --version 4.8.4 --reset-values \
+            -n monitoring -f monitoring/dcgm-values.yaml \
+            --set-file customMetrics=monitoring/dcgm-basic.csv \
+            --wait --timeout 8m
+          helm upgrade --install benchmark-pushgateway prometheus-community/prometheus-pushgateway \
+            -n monitoring -f benchmarks/final-benchmark/pushgateway-values.yaml \
+            --wait --timeout 6m
+      - name: Run the load test inside the vLLM pod, direct and through the gateway
+        env:
+          # Reached from inside the cluster, so no port-forward is involved.
+          PUSHGATEWAY_URL: http://benchmark-pushgateway-prometheus-pushgateway.monitoring.svc:9091
+          GATEWAY_URL: http://learning-gateway-gateway.default.svc:8080
+        run: |
+          set -euo pipefail
+          mkdir -p "$RESULTS"
+
+          POD=$(kubectl get pods -n default -l app.kubernetes.io/instance=learning \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [[ -z "$POD" ]]; then
+            POD=$(kubectl get pod -n default -o name | grep '/learning-vllm-' | head -n 1 | cut -d/ -f2)
+          fi
+          test -n "$POD"
+          echo "Load generator runs inside $POD (it shares the pod's CPUs with vLLM)"
+
+          REMOTE="/tmp/instructcoder-$RUN_ID"
+          kubectl exec -n default "$POD" -- mkdir -p "$REMOTE/results"
+          # The vLLM image already has Python and httpx; check before a long run.
+          kubectl exec -n default "$POD" -- python3 -c "import httpx, sys; print(sys.version, httpx.__version__)"
+          kubectl exec -i -n default "$POD" -- sh -c "cat > $REMOTE/load_test.py" \
+            < benchmarks/instructcoder/load_test.py
+
+          status=0
+          for target in vllm gateway; do
+            if [[ "$target" == vllm ]]; then url=http://127.0.0.1:8000; else url="$GATEWAY_URL"; fi
+            echo "=== target=$target url=$url ==="
+            # Same seed for both targets, so both send the same requests.
+            kubectl exec -n default "$POD" -- python3 "$REMOTE/load_test.py" \
+              --url "$url" \
+              --target "$target" \
+              --run-id "$RUN_ID" \
+              --concurrency "$CONCURRENCY" \
+              --num-requests "$NUM_REQUESTS" \
+              --cooldown "$COOLDOWN" \
+              --data-cache "$REMOTE/instructcoder-valid.json" \
+              --out "$REMOTE/results/$target" \
+              --pushgateway "$PUSHGATEWAY_URL" || status=1
+
+            # Copy each target's files out as soon as it finishes, even after a failure.
+            mkdir -p "$RESULTS/$target"
+            kubectl exec -n default "$POD" -- tar -C "$REMOTE/results/$target" -cf - . \
+              | tar -xf - -C "$RESULTS/$target" || status=1
+
+            if [[ "$target" == vllm ]]; then sleep "$COOLDOWN"; fi
+          done
+          kubectl exec -n default "$POD" -- rm -rf "$REMOTE" || true
+          exit "$status"
+      - name: Archive JSON and CSV as GitHub artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instructcoder-benchmark-${{ github.run_id }}
+          path: benchmarks/instructcoder/results/
+          if-no-files-found: warn
+          retention-days: 30

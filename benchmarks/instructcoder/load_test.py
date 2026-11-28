@@ -7,9 +7,13 @@ can measure time to first token (TTFT) as well as total latency.
     # Against the local gateway -> fake vLLM (no GPU, checks the script works):
     uv run python benchmarks/instructcoder/load_test.py --concurrency 1,4 --num-requests 8
 
-    # Against the cluster, through a port-forwarded gateway:
+    # Quick check against the cluster through a port-forwarded gateway (the
+    # numbers then include the laptop-to-cluster tunnel, so don't report them):
     kubectl port-forward svc/learning-gateway-gateway 8080:8080
-    uv run python benchmarks/instructcoder/load_test.py --cooldown 60
+    uv run python benchmarks/instructcoder/load_test.py --concurrency 1 --num-requests 4
+
+    # Reportable numbers: run inside the cluster with the "Run InstructCoder
+    # Benchmark" workflow, once against vLLM directly and once through the gateway.
 
 Data: the validation split of likaixin/InstructCoder, pinned to one dataset revision
 and downloaded on first use to a local cache (the dataset card states no license, so
@@ -20,7 +24,17 @@ Output: one JSON file per concurrency level (a summary plus every request's
 measurements) and a summary.csv, in --out. Generated text is not saved unless
 --save-outputs is given.
 
-Measured on the client, so the numbers include the gateway and port-forward hops.
+Measured on the client: TTFT and latency include every hop between this script and
+vLLM. Run it next to vLLM for the engine's numbers, through the gateway for the
+platform's, and compare the two.
+
+Prefix caching: vLLM reuses the KV cache of prompts it has seen. Every level sends the
+same requests, so without care later levels would skip most of the prompt work. Each
+level therefore sends its own vLLM `cache_salt`, which keeps its cache entries apart
+from every other level's and run's (pass --no-cache-salt to turn this off).
+
+Grafana: with --pushgateway, the summary of every finished level is pushed to a
+Prometheus Pushgateway, labelled with --run-id, --target and the concurrency.
 """
 
 from __future__ import annotations
@@ -33,6 +47,7 @@ import random
 import statistics
 import sys
 import time
+import uuid
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -44,6 +59,7 @@ DATASET = "likaixin/InstructCoder"
 REVISION = "6a778a720284d6520b56bd03d5c3070930d41071"
 SPLIT_FILE = "valid.json"
 DATA_URL = f"https://huggingface.co/datasets/{DATASET}/resolve/{REVISION}/{SPLIT_FILE}"
+PUSH_JOB = "instructcoder_benchmark"
 DEFAULT_CACHE = (
     Path.home() / ".cache" / "gpu-inference-platform" / f"instructcoder-{REVISION[:12]}-valid.json"
 )
@@ -98,9 +114,7 @@ async def detect_model(client: httpx.AsyncClient, url: str) -> str:
     return models[0]
 
 
-async def one_request(
-    client: httpx.AsyncClient, url: str, model: str, index: int, example: dict, args: argparse.Namespace
-) -> Result:
+def build_body(model: str, example: dict, args: argparse.Namespace, cache_salt: str | None) -> dict:
     body = {
         "model": model,
         "messages": build_messages(example),
@@ -109,6 +123,22 @@ async def one_request(
         "stream": True,
         "stream_options": {"include_usage": True},
     }
+    if cache_salt:
+        # vLLM only reuses cached prompt blocks between requests with the same salt.
+        body["cache_salt"] = cache_salt
+    return body
+
+
+async def one_request(
+    client: httpx.AsyncClient,
+    url: str,
+    model: str,
+    index: int,
+    example: dict,
+    args: argparse.Namespace,
+    cache_salt: str | None,
+) -> Result:
+    body = build_body(model, example, args, cache_salt)
     start = time.perf_counter()
     ttft = None
     usage: dict = {}
@@ -194,6 +224,7 @@ def summarize(concurrency: int, results: list[Result], wall_s: float) -> dict:
         v = percentile(values, p)
         return round(v, 2) if v is not None else None
 
+    finish_reasons = Counter(r.finish_reason for r in ok)
     return {
         "concurrency": concurrency,
         "requests": len(results),
@@ -212,8 +243,45 @@ def summarize(concurrency: int, results: list[Result], wall_s: float) -> dict:
         "prompt_tokens_p95": stat(prompt, 95),
         "completion_tokens_p50": stat(completion, 50),
         "completion_tokens_p95": stat(completion, 95),
-        "finish_reasons": dict(Counter(r.finish_reason for r in ok)),
+        # Answers cut off by --max-tokens; a high count means the cap is too low.
+        "finish_length": finish_reasons.get("length", 0),
+        "finish_reasons": dict(finish_reasons),
     }
+
+
+def is_label(value: str) -> bool:
+    """Safe as a Pushgateway URL path segment and a Prometheus label value."""
+    return bool(value) and all(c.isalnum() or c in "-_." for c in value)
+
+
+def metrics_text(summaries: list[dict]) -> str:
+    """Prometheus text format: one gauge per numeric summary field, labelled by concurrency."""
+    fields = [
+        k
+        for k in summaries[0]
+        if k != "concurrency" and any(isinstance(s.get(k), int | float) for s in summaries)
+    ]
+    lines = []
+    for field in fields:
+        name = f"instructcoder_{field}"
+        lines.append(f"# TYPE {name} gauge")
+        for s in summaries:
+            if isinstance(s.get(field), int | float):
+                lines.append(f'{name}{{concurrency="{s["concurrency"]}"}} {s[field]}')
+    return "\n".join(lines) + "\n"
+
+
+async def push_summaries(
+    client: httpx.AsyncClient, pushgateway: str, run_id: str, target: str, summaries: list[dict]
+) -> None:
+    """Replace this run and target's group in the Pushgateway with every level so far."""
+    url = f"{pushgateway.rstrip('/')}/metrics/job/{PUSH_JOB}/run_id/{run_id}/target/{target}"
+    try:
+        response = await client.put(url, content=metrics_text(summaries).encode())
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        # The JSON and CSV files are the record; Grafana is a convenience.
+        print(f"warning: push to {url} failed: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
 async def run_level(
@@ -223,12 +291,13 @@ async def run_level(
     concurrency: int,
     batch: list[tuple[int, dict]],
     args: argparse.Namespace,
+    cache_salt: str | None,
 ) -> tuple[dict, list[Result]]:
     gate = asyncio.Semaphore(concurrency)
 
     async def limited(index: int, example: dict) -> Result:
         async with gate:
-            return await one_request(client, url, model, index, example, args)
+            return await one_request(client, url, model, index, example, args, cache_salt)
 
     start = time.perf_counter()
     results = await asyncio.gather(*(limited(i, ex) for i, ex in batch))
@@ -243,16 +312,26 @@ async def main_async(args: argparse.Namespace) -> int:
     url = args.url.rstrip("/")
     out = args.out or Path("benchmarks/instructcoder/results") / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out.mkdir(parents=True, exist_ok=True)
+    run_id = args.run_id or out.name
+    if not is_label(run_id):
+        raise SystemExit(f"Run id {run_id!r} may only use letters, digits, '-', '_' and '.'; pass --run-id")
+    salt_prefix = None if args.no_cache_salt else f"{run_id}-{args.target}-{uuid.uuid4().hex[:8]}"
+
+    def salt(label: str) -> str | None:
+        return f"{salt_prefix}-{label}" if salt_prefix else None
 
     limits = httpx.Limits(max_connections=max(levels) + 4, max_keepalive_connections=max(levels) + 4)
     timeout = httpx.Timeout(args.timeout, connect=10)
     async with httpx.AsyncClient(limits=limits, timeout=timeout) as client:
         model = args.model or await detect_model(client, url)
-        print(f"Model: {model}  URL: {url}  levels: {levels}  requests/level: {args.num_requests}")
+        print(
+            f"Model: {model}  URL: {url}  target: {args.target}  run: {run_id}  "
+            f"levels: {levels}  requests/level: {args.num_requests}"
+        )
 
         warmup = [(sample[0], examples[sample[0]])] * args.warmup
         if warmup:
-            await run_level(client, url, model, 1, warmup, args)
+            await run_level(client, url, model, 1, warmup, args, salt("warmup"))
 
         summaries = []
         for n, concurrency in enumerate(levels):
@@ -260,11 +339,16 @@ async def main_async(args: argparse.Namespace) -> int:
             batch = [
                 (sample[k % len(sample)], examples[sample[k % len(sample)]]) for k in range(args.num_requests)
             ]
-            summary, results = await run_level(client, url, model, concurrency, batch, args)
+            summary, results = await run_level(
+                client, url, model, concurrency, batch, args, salt(f"c{concurrency}")
+            )
             summaries.append(summary)
             run_info = {
+                "run_id": run_id,
+                "target": args.target,
                 "model": model,
                 "url": url,
+                "cache_salt": salt(f"c{concurrency}"),
                 "dataset": f"{DATASET}@{REVISION}",
                 "split": SPLIT_FILE,
                 "seed": args.seed,
@@ -279,6 +363,8 @@ async def main_async(args: argparse.Namespace) -> int:
                 f"out_tok/s={summary['output_tokens_per_s']}  ttft_p95_ms={summary['ttft_ms_p95']}  "
                 f"tpot_mean_ms={summary['tpot_ms_mean']}  latency_p95_s={summary['latency_s_p95']}"
             )
+            if args.pushgateway:
+                await push_summaries(client, args.pushgateway, run_id, args.target, summaries)
             if args.cooldown and n + 1 < len(levels):
                 await asyncio.sleep(args.cooldown)
 
@@ -291,7 +377,7 @@ async def main_async(args: argparse.Namespace) -> int:
     return 0 if all(s["failed"] == 0 for s in summaries) else 1
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -313,7 +399,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data-cache", type=Path, default=DEFAULT_CACHE)
     parser.add_argument("--out", type=Path, help="results directory; default: results/<UTC timestamp>")
     parser.add_argument("--save-outputs", action="store_true", help="also store generated text per request")
-    return parser.parse_args()
+    parser.add_argument(
+        "--target", default="unlabelled", help="what --url points at, e.g. vllm or gateway (a label)"
+    )
+    parser.add_argument("--run-id", help="label for this run in Prometheus; default: the --out folder name")
+    parser.add_argument("--pushgateway", help="Pushgateway base URL, e.g. http://localhost:9091")
+    parser.add_argument(
+        "--no-cache-salt", action="store_true", help="let levels share vLLM's prefix cache (not comparable)"
+    )
+    args = parser.parse_args(argv)
+    if not is_label(args.target):
+        parser.error("--target may only use letters, digits, '-', '_' and '.'")
+    return args
 
 
 def main() -> int:

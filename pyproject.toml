@@ -23,7 +23,7 @@ package = false
 
 [tool.pytest.ini_options]
 # tests/smoke_test.py is a script for a live cluster, not a pytest module.
-testpaths = ["tests/gateway", "tests/hooks"]
+testpaths = ["tests/gateway", "tests/hooks", "tests/benchmarks"]
 addopts = "-q"
 
 [tool.ruff]
