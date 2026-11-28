@@ -10,7 +10,7 @@ A learning and portfolio project that serves an OpenAI-compatible LLM API on Goo
 - **vLLM** (`helm/vllm/`, release `learning`) serves `Qwen/Qwen2.5-Coder-7B-Instruct` on the L4 (Stage 0; earlier benchmarks used `Qwen/Qwen3-0.6B`). Model, `maxModelLen`, `gpuMemoryUtilization` and the model cache size are set in `helm/vllm/values.yaml`. Service `learning-vllm:8000`, routes `/v1/models`, `/v1/chat/completions`, `/health`, `/metrics`.
 - **FastAPI gateway** (`helm/gateway/`, release `learning-gateway`) runs on the CPU pool and forwards requests to vLLM. Service `learning-gateway-gateway:8080`. Its code is `helm/gateway/files/main.py`, shipped in a ConfigMap and installed with `pip` at pod start (no custom image yet). It forwards `"stream": true` responses chunk by chunk through one shared httpx connection pool. Timeouts come from `GATEWAY_CONNECT_TIMEOUT_S` (default 5) and `GATEWAY_READ_TIMEOUT_S` (default 120, the maximum gap between chunks).
 - **Monitoring** (`monitoring/`): kube-prometheus-stack (release `monitoring`, namespace `monitoring`), NVIDIA DCGM Exporter on the GPU node, and a vLLM ServiceMonitor. Grafana dashboards are stored as JSON.
-- **Benchmarks** (`benchmarks/`): early load tests, the official `vllm bench serve` concurrency sweep in `benchmarks/final-benchmark/` (results, Pushgateway publisher, dashboard), and the InstructCoder code-edit load test in `benchmarks/instructcoder/` (downloads a pinned dataset revision at run time; the data isn't committed). Stage write-ups live in `docs/stage-N.md`.
+- **Benchmarks** (`benchmarks/`): early load tests, the official `vllm bench serve` concurrency sweep in `benchmarks/final-benchmark/` (results, Pushgateway publisher, dashboard), and the InstructCoder code-edit load test in `benchmarks/instructcoder/` (downloads a pinned dataset revision at run time; the data isn't committed). `run-instructcoder-benchmark.yml` runs it inside the vLLM pod against vLLM directly and through the gateway, and pushes per-level summaries to the Pushgateway (`instructcoder_*` metrics, labels `run_id`, `target`, `concurrency`). Tests: `tests/benchmarks/`. Stage write-ups live in `docs/stage-N.md`.
 - **GitHub Actions** (`.github/workflows/`) is the only way infrastructure is created, scaled, deployed, benchmarked, or destroyed. Workflows authenticate with OIDC / Workload Identity Federation using repo variables `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT`. Terraform workflows read the state bucket name from `TF_STATE_BUCKET` and pass it to `terraform init -backend-config`, because `terraform/backend.tf` doesn't name the bucket.
 
 All Services are ClusterIP. Access is through `kubectl port-forward` only. The gateway has no authentication.
@@ -60,7 +60,7 @@ make ttft-local      # terminal 3: streaming TTFT/total latency via dev/ttft_pro
 
 The same two servers are defined in `.claude/launch.json` (`fake-vllm`, `gateway`).
 
-**Gateway tests** (`tests/gateway/`) run the real `helm/gateway/files/main.py` and the fake vLLM as uvicorn servers on free ports and test them over HTTP. Known gaps (`/metrics`, request IDs) are `xfail(strict=True)`. When you implement one, its test passes, pytest reports XPASS as a failure, and you must remove the marker.
+**Gateway tests** (`tests/gateway/`, shared fixtures in `tests/conftest.py`) run the real `helm/gateway/files/main.py` and the fake vLLM as uvicorn servers on free ports and test them over HTTP. Known gaps (`/metrics`, request IDs) are `xfail(strict=True)`. When you implement one, its test passes, pytest reports XPASS as a failure, and you must remove the marker.
 
 Fake-vLLM results say nothing about real latency or throughput. Benchmarks need the real cluster.
 
@@ -71,7 +71,7 @@ Against a running cluster, with a port-forward open: `python3 tests/smoke_test.p
 - **Honest documentation.** The README separates what was verified, when, and under what conditions from what wasn't. Keep that standard: date measurements, label single trials as single trials, and never claim something was tested end to end unless it was. Mark unverified work as unverified.
 - **Pin versions.** Container image tags, Helm chart versions, and Python packages are pinned. Keep them pinned when adding new ones.
 - **Keep workloads on the right pool.** Only vLLM (and DCGM Exporter, which doesn't request the GPU) goes on `gpu-l4-pool`. Everything else uses `nodeSelector: cloud.google.com/gke-nodepool: cpu-pool`.
-- **Workflows that change infrastructure** take a `workflow_dispatch` confirmation string (for example `START_GPU_PLATFORM`, `DESTROY_GKE`, `RUN_BENCHMARK`) and share the `terraform-gke-state` concurrency group. Follow the same pattern for new ones.
+- **Workflows that change infrastructure** take a `workflow_dispatch` confirmation string (for example `START_GPU_PLATFORM`, `DESTROY_GKE`, `RUN_BENCHMARK`, `RUN_INSTRUCTCODER_BENCHMARK`) and share the `terraform-gke-state` concurrency group. Follow the same pattern for new ones.
 - **Gateway changes:** edit `helm/gateway/files/main.py` and run `make check`. The Deployment's checksum annotation restarts the pod when it changes. Add new Python dependencies, with pinned versions, to **both** the `pip install` line in `helm/gateway/templates/deployment.yaml` and `pyproject.toml` (then `uv lock`).
 - **Benchmark results** are committed as raw JSON/CSV next to the script that produced them, and summarised in `benchmarks/README.md` and the main README.
 - Commit messages are short imperative sentences describing the change (see `git log`).
@@ -87,5 +87,6 @@ Against a running cluster, with a port-forward open: `python3 tests/smoke_test.p
 | Agent permissions and hooks | `.claude/settings.json`, `.claude/hooks/`, tests in `tests/hooks/` |
 | Start / scale / deploy / destroy | `.github/workflows/` (`start-platform.yml` is the all-in-one) |
 | Official benchmark pipeline | `.github/workflows/run-final-benchmark.yml`, `benchmarks/final-benchmark/` |
+| Code-edit benchmark (vLLM vs gateway) | `.github/workflows/run-instructcoder-benchmark.yml`, `benchmarks/instructcoder/` |
 | Monitoring setup and verification | `monitoring/README.md`, `benchmarks/final-benchmark/benchmark-monitoring.md` |
 | Roadmap | `docs/ROADMAP.md` (staged plan); README section "Further work — scaling and reliability" |
