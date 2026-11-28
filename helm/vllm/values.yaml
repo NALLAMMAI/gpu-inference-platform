@@ -2,8 +2,19 @@ replicaCount: 1
 image:
   repository: vllm/vllm-openai
   tag: v0.11.0
-model: Qwen/Qwen3-0.6B
+# Stage 0: a code model that nearly fills the L4 (about 15 GB of BF16 weights
+# out of 24 GB). See docs/stage-0.md.
+model: Qwen/Qwen2.5-Coder-7B-Instruct
 gpuCount: 1
+# Longest prompt + answer one request may use. Code-edit requests carry a whole
+# file in and a whole file out, so this is larger than the old 4096.
+maxModelLen: 8192
+# Share of GPU memory vLLM may use (weights + KV cache + working space).
+# 0.90 is vLLM's default, written out so it is visible and easy to change.
+gpuMemoryUtilization: 0.90
+# Node disk used to cache the downloaded model. The 7B weights are about 15 GB,
+# so the old 10Gi limit would get the Pod evicted mid-download.
+modelCacheSizeLimit: 30Gi
 service:
   port: 8000
 resources:
