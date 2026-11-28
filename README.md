@@ -2,7 +2,7 @@
 
 A hands-on learning project for deploying an **OpenAI-compatible LLM inference service** on **Google Kubernetes Engine (GKE)**, with infrastructure managed by **Terraform**, applications deployed using **Helm**, and CI/CD orchestrated through **GitHub Actions**.
 
-The platform serves **`Qwen/Qwen3-0.6B`** using **vLLM** on one **NVIDIA L4 GPU**. A **FastAPI gateway** runs separately on a CPU node and forwards inference requests to vLLM over the cluster network. An optional monitoring stack uses **Prometheus**, **Grafana**, and **NVIDIA DCGM Exporter** to observe the GPU and vLLM scheduler.
+The platform serves an LLM using **vLLM** on one **NVIDIA L4 GPU**. The Helm chart now configures **`Qwen/Qwen2.5-Coder-7B-Instruct`** ([Stage 0](docs/stage-0.md), **not yet deployed or measured**). All benchmark results below were measured with **`Qwen/Qwen3-0.6B`**. A **FastAPI gateway** runs separately on a CPU node and forwards inference requests to vLLM over the cluster network. An optional monitoring stack uses **Prometheus**, **Grafana**, and **NVIDIA DCGM Exporter** to observe the GPU and vLLM scheduler.
 
 > **Infrastructure lifecycle:** The GKE cluster and NVIDIA L4 GPU resources are provisioned on demand using Terraform and GitHub Actions. After benchmarking, the infrastructure can be destroyed to avoid ongoing GPU and compute costs. Benchmark results, Grafana dashboard configurations, and deployment manifests are preserved in GitHub for reproducibility.
 
@@ -39,7 +39,7 @@ Client (Cloud Shell / local laptop)
      |                  v
      +-- GPU pool: gpu-l4-pool (0 or 1 x g2-standard-4)
            |
-           +-- vLLM Pod: Qwen/Qwen3-0.6B
+           +-- vLLM Pod: Qwen/Qwen2.5-Coder-7B-Instruct (earlier benchmarks: Qwen/Qwen3-0.6B)
                  NVIDIA L4: 24 GB VRAM
                  Service: learning-vllm:8000
                  Routes: /v1/models, /v1/chat/completions, /metrics
@@ -56,7 +56,7 @@ Client (Cloud Shell / local laptop)
 | CPU node pool | `cpu-pool`: 1 × `e2-standard-2` (2 vCPUs, 8 GB RAM, 100 GB boot disk) |
 | GPU node pool | `gpu-l4-pool`: 0 or 1 × `g2-standard-4` (4 vCPUs, 16 GB RAM, 100 GB boot disk) |
 | GPU | 1 × NVIDIA L4, 24 GB VRAM when GPU pool is scaled to 1 |
-| Model/server | `Qwen/Qwen3-0.6B` via vLLM |
+| Model/server | `Qwen/Qwen2.5-Coder-7B-Instruct` via vLLM `v0.11.0` (Stage 0, not yet deployed); benchmarks below used `Qwen/Qwen3-0.6B` |
 | Applications | FastAPI gateway on CPU pool, vLLM on GPU pool |
 | IaC / delivery | Terraform + GCS remote state, GitHub Actions OIDC/WIF, Helm |
 
@@ -70,11 +70,13 @@ The GPU pool can exist with **zero worker nodes**. CPU-only infrastructure still
 | [`helm/vllm/`](helm/vllm/) | vLLM Deployment and internal Service, GPU resource request and scheduling |
 | [`helm/gateway/`](helm/gateway/) | FastAPI gateway, ConfigMap-backed application code and internal Service |
 | [`benchmarks/`](benchmarks/) | Concurrency, varied-prompt and staggered-arrival load tests, final results JSON and reproducible script |
+| [`benchmarks/instructcoder/`](benchmarks/instructcoder/) | Code-edit load test using InstructCoder validation examples (Stage 0 onward) |
 | [`benchmarks/README.md`](benchmarks/README.md) | Measurements, interpretation, graphs, and reproduction commands |
 | [`monitoring/`](monitoring/) | Prometheus/Grafana Helm values, DCGM Exporter, vLLM ServiceMonitor and original Grafana dashboard |
 | [`tests/`](tests/) | Inference smoke-test script for a live cluster; gateway tests in [`tests/gateway/`](tests/gateway/) that run locally against a fake vLLM |
 | [`dev/`](dev/), [`Makefile`](Makefile), [`pyproject.toml`](pyproject.toml) | Local development without a GPU: fake vLLM server, `make check` / `make run-gateway`, Python deps via uv |
 | [`.github/workflows/`](.github/workflows/) | Validation, provision, scale, deploy, destroy, and combined startup workflows |
+| [`docs/stage-0.md`](docs/stage-0.md) | Stage 0 write-up: switching to a 7B code model, predictions, run steps |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Staged plan: bulk code editing with a self-hosted coder model, from one GPU to batch jobs and fine-tuning |
 | [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) | Guide for AI coding agents: architecture, safety rules for billable resources, local checks, conventions |
 | [`.claude/`](.claude/) | Claude Code permission rules, hooks that block destructive cloud commands and auto-format Python, local dev server definitions |
@@ -173,11 +175,19 @@ See the [full benchmark results, caveats, and charts](benchmarks/README.md), inc
 
 With the gateway port-forward running, from the repository root:
 
+These early scripts default to `Qwen/Qwen3-0.6B`; pass `--model` to match the deployed model.
+
 ```bash
 python3 -m pip install --user httpx
 python3 benchmarks/load_test.py 5 --mode identical
 python3 benchmarks/load_test.py 20 --mode varied
 python3 benchmarks/load_test_continuous_batching.py --delay 1
+```
+
+For real code-edit traffic, [`benchmarks/instructcoder/load_test.py`](benchmarks/instructcoder/load_test.py) sends InstructCoder edit requests at concurrency 1–32 and records TTFT, time per output token, latency and token counts. It reads the model id from `/v1/models`. See [Stage 0](docs/stage-0.md) for how to run it.
+
+```bash
+uv run python benchmarks/instructcoder/load_test.py --cooldown 60
 ```
 
 To inspect vLLM metrics, use a **separate** port-forward:

@@ -31,7 +31,13 @@ line-length = 110
 target-version = "py312"
 # Lint only the Python developed with this tooling; benchmark scripts are
 # kept as they were run.
-include = ["dev/**/*.py", "tests/**/*.py", "helm/gateway/files/*.py", ".claude/hooks/*.py"]
+include = [
+    "dev/**/*.py",
+    "tests/**/*.py",
+    "helm/gateway/files/*.py",
+    ".claude/hooks/*.py",
+    "benchmarks/instructcoder/*.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

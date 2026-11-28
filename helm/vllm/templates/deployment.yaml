@@ -32,7 +32,9 @@ spec:
             - --port
             - "8000"
             - --max-model-len
-            - "4096"
+            - {{ .Values.maxModelLen | quote }}
+            - --gpu-memory-utilization
+            - {{ .Values.gpuMemoryUtilization | quote }}
           # GKE mounts NVIDIA driver libraries here for GPU containers.
           # Allow vLLM to locate libcuda.so.1 at startup.
           env:
@@ -59,4 +61,4 @@ spec:
       volumes:
         - name: cache
           emptyDir:
-            sizeLimit: 10Gi
+            sizeLimit: {{ .Values.modelCacheSizeLimit }}
