@@ -70,7 +70,7 @@ The GPU pool can exist with **zero worker nodes**. CPU-only infrastructure still
 | [`helm/vllm/`](helm/vllm/) | vLLM Deployment and internal Service, GPU resource request and scheduling |
 | [`helm/gateway/`](helm/gateway/) | FastAPI gateway, ConfigMap-backed application code and internal Service |
 | [`benchmarks/`](benchmarks/) | Concurrency, varied-prompt and staggered-arrival load tests, final results JSON and reproducible script |
-| [`benchmarks/instructcoder/`](benchmarks/instructcoder/) | Code-edit load test using InstructCoder validation examples (Stage 0 onward) |
+| [`benchmarks/instructcoder/`](benchmarks/instructcoder/) | Code-edit load test using InstructCoder validation examples, its Grafana dashboard, and results (Stage 0 onward) |
 | [`benchmarks/README.md`](benchmarks/README.md) | Measurements, interpretation, graphs, and reproduction commands |
 | [`monitoring/`](monitoring/) | Prometheus/Grafana Helm values, DCGM Exporter, vLLM ServiceMonitor and original Grafana dashboard |
 | [`tests/`](tests/) | Inference smoke-test script for a live cluster; gateway tests in [`tests/gateway/`](tests/gateway/) that run locally against a fake vLLM |
@@ -184,10 +184,12 @@ python3 benchmarks/load_test.py 20 --mode varied
 python3 benchmarks/load_test_continuous_batching.py --delay 1
 ```
 
-For real code-edit traffic, [`benchmarks/instructcoder/load_test.py`](benchmarks/instructcoder/load_test.py) sends InstructCoder edit requests at concurrency 1–32 and records TTFT, time per output token, latency and token counts. It reads the model id from `/v1/models`. See [Stage 0](docs/stage-0.md) for how to run it.
+For real code-edit traffic, [`benchmarks/instructcoder/load_test.py`](benchmarks/instructcoder/load_test.py) sends InstructCoder edit requests at concurrency 1–32 and records TTFT, time per output token, latency and token counts. It reads the model id from `/v1/models` and gives every level its own vLLM `cache_salt`, so repeated requests don't hit the prefix cache. Reportable numbers come from the **[Run InstructCoder Benchmark](.github/workflows/run-instructcoder-benchmark.yml)** workflow (confirmation `RUN_INSTRUCTCODER_BENCHMARK`). It runs the script inside the vLLM pod twice with the same requests: straight to vLLM, then through the gateway Service. It pushes each level to the Pushgateway for the [InstructCoder Grafana dashboard](benchmarks/instructcoder/instructcoder-dashboard.json) and uploads the JSON/CSV as an artifact. Both the workflow and the dashboard are **not yet run on the cluster**. See [Stage 0](docs/stage-0.md).
+
+A quick check from a laptop through a port-forward works too, but its timings include the tunnel, so don't report them:
 
 ```bash
-uv run python benchmarks/instructcoder/load_test.py --cooldown 60
+uv run python benchmarks/instructcoder/load_test.py --concurrency 1 --num-requests 4
 ```
 
 To inspect vLLM metrics, use a **separate** port-forward:
